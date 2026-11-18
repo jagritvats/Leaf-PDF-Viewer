@@ -1,7 +1,8 @@
 # Pack the PyInstaller bundle (dist\Leaf) as an MSIX for the Microsoft Store or sideloading. From the repo root:
 #   pwsh packaging\msix\build_msix.ps1                                   # unsigned, placeholder identity
 #   pwsh packaging\msix\build_msix.ps1 -IdentityName 12345Owner.Leaf -Publisher "CN=XXXXXXXX-..." `
-#        -PublisherDisplayName "Owner" -DisplayName "Leaf PDF Editor"     # Store upload (the Store signs it); -DisplayName = reserved name
+#        -PublisherDisplayName "Owner" -DisplayName "Leaf PDF Editor" -NoCli  # Store upload (the Store signs it);
+#        -DisplayName = the reserved name, -NoCli = no console twin (Partner Center rejects headless apps)
 #   pwsh packaging\msix\build_msix.ps1 -Publisher "CN=Leaf Dev" -CertPath dev.pfx -CertPassword ...  # sideload test
 # Needs the Windows 10/11 SDK (makeappx.exe; makepri.exe and signtool.exe optional), nothing is installed here.
 # Output: dist\Leaf-<version>-windows-x64<suffix>.msix
@@ -16,7 +17,8 @@ param(
     [string]$OutDir = "dist",
     [string]$CertPath = "",
     [string]$CertPassword = "",
-    [string]$Python = ""
+    [string]$Python = "",
+    [switch]$NoCli
 )
 $ErrorActionPreference = "Stop"
 $root = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
@@ -51,6 +53,11 @@ $stage = Join-Path $root "build\msix\stage$Suffix"
 if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
 New-Item -ItemType Directory -Force $stage | Out-Null
 Copy-Item (Join-Path $SourceDir "*") $stage -Recurse
+if ($NoCli) {
+    # Microsoft Store: the console twin is a second, list-less Application (a "headless app"), which Partner Center
+    # rejects without a HeadlessAppBypass waiver. Store builds leave it out; the zip and installer keep leaf-cli.exe.
+    Remove-Item (Join-Path $stage "leaf-cli.exe") -ErrorAction SilentlyContinue
+}
 & $Python packaging\msix\make_assets.py (Join-Path $stage "Assets")
 if ($LASTEXITCODE) { throw "make_assets.py failed" }
 

@@ -177,7 +177,7 @@ Leaf is a desktop PDF editor (Win32, Qt) packaged as MSIX. runFullTrust is requi
 
 ### Notes for certification
 ```
-No account or sign-in is needed. To test: launch Leaf PDF Editor, then File > Open any PDF. Try editing text (Edit text tool), annotating (toolbar), filling a form, and File > Save As. The command line twin is available as the "leaf-cli" execution alias (e.g. leaf-cli info file.pdf). The app works fully offline.
+No account or sign-in is needed. To test: launch Leaf PDF Editor, then File > Open any PDF. Try editing text (Edit text tool), annotating (toolbar), filling a form, and File > Save As. The app works fully offline.
 ```
 
 ### Publishing hold

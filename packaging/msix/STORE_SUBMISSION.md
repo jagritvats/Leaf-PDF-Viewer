@@ -20,7 +20,7 @@ From the repo root, after building `dist\Leaf` with `packaging\leaf.spec` (Windo
 
 ```powershell
 pwsh packaging\msix\build_msix.ps1 -IdentityName "<Name>" -Publisher "CN=<...>" `
-     -PublisherDisplayName "<PublisherDisplayName>" -DisplayName "<reserved name>"
+     -PublisherDisplayName "<PublisherDisplayName>" -DisplayName "<reserved name>" -NoCli
 ```
 
 This writes `dist\Leaf-<version>-windows-x64.msix`. `-DisplayName` must be exactly the reserved name. Each new
