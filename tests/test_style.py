@@ -250,6 +250,27 @@ def test_start_screen_recent_open_and_clear(app, windows, tmp_path):  # noqa: F8
     assert wv.recent.count() == 0 and not win.settings.value("recent") and wv.empty.isVisibleTo(wv)
 
 
+def test_start_screen_paints_covers_without_disk_access(app, windows, tmp_path, monkeypatch):  # noqa: F811
+    """A cover repaints on every hover: reading the file's time there stalled the window on a slow or vanished
+    network drive. It is read once per refresh."""
+    p = str(tmp_path / "net.pdf")
+    make_pdf(p, form=False)
+    win = windows()
+    win.settings.setValue("recent", [p])
+    wv = win.welcome
+    wv.refresh()
+    wait_until(lambda: wv.recent.item(0).data(Qt.ItemDataRole.UserRole + 7) is not None, msg="cover")
+    import leaf.welcome as welcome
+
+    stats = []
+    real = os.path.getmtime
+    monkeypatch.setattr(welcome.os.path, "getmtime", lambda q: stats.append(q) or real(q))
+    wv.recent.viewport().repaint()
+    assert wv.recent.isVisible() and not stats
+    wv.refresh()
+    assert stats and wv.recent.item(0).data(welcome.AGO_ROLE) == "Just now"
+
+
 def test_start_screen_scrolls_past_five_covers(app, windows, tmp_path):  # noqa: F811
     one = str(tmp_path / "one.pdf")
     make_pdf(one, form=False)

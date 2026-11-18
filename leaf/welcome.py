@@ -17,6 +17,7 @@ from .icons import app_icon, icon
 
 PATH_ROLE = Qt.ItemDataRole.UserRole
 IMG_ROLE = Qt.ItemDataRole.UserRole + 7  # the cover image (QImage at the screen's pixel ratio)
+AGO_ROLE = Qt.ItemDataRole.UserRole + 8  # "3 h ago": read once per refresh, not on every paint (no disk access there)
 COVER_W = 188  # one recent file: page cover, name, when (height: cover_size())
 PAGE_BOX = QSize(156, 204)  # the page inside it
 SHELF = 5  # covers visible side by side; more scroll sideways
@@ -244,7 +245,7 @@ class CoverDelegate(QStyledItemDelegate):
         p.drawText(tx, center, QFontMetrics(f).elidedText(display_name(path), Qt.TextElideMode.ElideMiddle, int(tx.width())))
         p.setFont(opt.font)
         p.setPen(t.text2)
-        p.drawText(QRectF(tx.left(), tx.bottom(), tx.width(), line), center, ago(path))
+        p.drawText(QRectF(tx.left(), tx.bottom(), tx.width(), line), center, idx.data(AGO_ROLE) or "")
         p.restore()
 
 
@@ -394,9 +395,11 @@ class WelcomeView(QWidget):
         paths = paths[:MAX_RECENT]
         for p in paths:
             it = QListWidgetItem()
+            when = ago(p)
             it.setData(PATH_ROLE, p)
+            it.setData(AGO_ROLE, when)
             it.setData(Qt.ItemDataRole.AccessibleTextRole, os.path.basename(p))
-            it.setData(Qt.ItemDataRole.AccessibleDescriptionRole, f"{_short_dir(p)}, {ago(p)}")
+            it.setData(Qt.ItemDataRole.AccessibleDescriptionRole, f"{_short_dir(p)}, {when}")
             it.setToolTip(p)
             it.setSizeHint(cover_size(self.recent.font()))
             self.recent.addItem(it)
