@@ -87,6 +87,21 @@ def test_idle_window_does_not_resync_panels(app, windows, doc):  # noqa: F811
     assert len(ticks) <= 2
 
 
+def test_style_sheet_changes_no_font_in_a_state(app):  # noqa: F811
+    """Qt draws a font set in a pseudo-state rule (:default, :hover...) but measures the widget with its own font:
+    the default button's bold text was cut off ("Browse..." in the Sign dialog)."""
+    import re
+
+    from leaf.style import theme, tokens
+
+    for dark in (False, True):
+        css = theme.stylesheet(tokens.build(dark, None), {k: "x" for k in theme.ASSETS})
+        css = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+        bad = [sel.strip() for sel, body in re.findall(r"([^{}]+)\{([^}]*)\}", css)
+               if "font" in body and re.search(r"(?<!:):(?!:)", sel)]
+        assert not bad, bad
+
+
 def test_page_hits_ignore_the_shadow_margin(app, windows, doc):  # noqa: F811
     win = windows()
     open_in(win, doc)
