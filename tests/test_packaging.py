@@ -240,6 +240,14 @@ def test_msix_assets_render(app, tmp_path):  # noqa: F811 - pytest fixture
     assert (img.width(), img.height()) == (620, 300)
     assert QImage(str(tmp_path / "Square44x44Logo.targetsize-256_altform-unplated.png")).width() == 256
     assert QImage(str(tmp_path / "StoreLogo.png")).pixelColor(25, 25).alpha() == 255  # icon drawn, not empty
+    # plated assets are full-bleed (a transparent margin is shown as a blue accent frame by Windows and the Store);
+    # only the unplated taskbar/Start icons keep transparent corners
+    for name in ("StoreLogo.png", "Square150x150Logo.scale-200.png", "Square44x44Logo.targetsize-48.png"):
+        corner = QImage(str(tmp_path / name)).pixelColor(0, 0)
+        assert corner.alpha() == 255 and corner.green() > corner.blue(), name
+    assert QImage(str(tmp_path / "Square44x44Logo.targetsize-48_altform-unplated.png")).pixelColor(0, 0).alpha() == 0
+    manifest = _read("packaging", "msix", "AppxManifest.xml")
+    assert manifest.count(f'BackgroundColor="{mod.PLATE}"') == 2  # the plate color matches the assets
     assert len(files) == 2 * 6 + 2 * len(mod.TARGET_SIZES)
 
 

@@ -6,6 +6,11 @@ The icon is drawn in code like leaf/icons.py app_icon() (same leaf path and colo
 each asset instead of scaling a 256 px bitmap. Each asset is written at scale-100 (the unqualified name the
 manifest references) and scale-200; Square44x44Logo also gets the targetsize-N (plated and altform-unplated)
 variants the taskbar and Start use. build_msix.ps1 indexes the qualified files with makepri.
+
+Plated assets (tiles, the store logo, the plated app-list icons) are full-bleed: the green fills the whole square
+and only the white leaf is drawn on it. Windows and the Store draw those on a plate in the manifest's
+BackgroundColor, so any transparent margin showed up as a blue (accent-colored) frame. Only the altform-unplated
+icons (taskbar, Windows 11 Start) keep the rounded green square on transparency.
 """
 from __future__ import annotations
 
@@ -34,17 +39,23 @@ ASSETS = {
 TARGET_SIZES = (16, 20, 24, 30, 32, 36, 40, 48, 60, 64, 72, 80, 96, 256)
 
 
-def draw_icon(p: QPainter, x: float, y: float, size: float) -> None:
-    """The Leaf icon (white leaf on a green rounded square) in the size x size square at (x, y)."""
+TOP, BOTTOM = "#43c463", "#1f8a3b"  # the icon's gradient
+PLATE = "#2fa84f"  # its middle: AppxManifest.xml BackgroundColor (tests/test_packaging.py keeps them equal)
+
+
+def draw_icon(p: QPainter, x: float, y: float, size: float, square: bool = True) -> None:
+    """The Leaf icon in the size x size square at (x, y): the white leaf on a green rounded square, or (square=False)
+    the white leaf alone, for drawing on a full-bleed green plate."""
     p.save()
     p.translate(x, y)
     p.scale(size / 24, size / 24)
-    g = QLinearGradient(0, 0, 0, 24)
-    g.setColorAt(0, QColor("#43c463"))
-    g.setColorAt(1, QColor("#1f8a3b"))
     p.setPen(Qt.PenStyle.NoPen)
-    p.setBrush(g)
-    p.drawRoundedRect(QRectF(1, 1, 22, 22), 5.5, 5.5)
+    if square:
+        g = QLinearGradient(0, 0, 0, 24)
+        g.setColorAt(0, QColor(TOP))
+        g.setColorAt(1, QColor(BOTTOM))
+        p.setBrush(g)
+        p.drawRoundedRect(QRectF(1, 1, 22, 22), 5.5, 5.5)
     p.translate(12, 12)
     p.scale(0.82, 0.82)
     p.translate(-12, -12.5)
@@ -55,13 +66,19 @@ def draw_icon(p: QPainter, x: float, y: float, size: float) -> None:
     p.restore()
 
 
-def render(w: int, h: int, frac: float) -> QImage:
+def render(w: int, h: int, frac: float, plated: bool = True) -> QImage:
+    """plated: full-bleed green with the leaf (frac = leaf area / height); unplated: the rounded icon on transparency."""
     img = QImage(w, h, QImage.Format.Format_ARGB32_Premultiplied)
     img.fill(Qt.GlobalColor.transparent)
     p = QPainter(img)
     p.setRenderHint(QPainter.RenderHint.Antialiasing)
+    if plated:
+        g = QLinearGradient(0, 0, 0, h)
+        g.setColorAt(0, QColor(TOP))
+        g.setColorAt(1, QColor(BOTTOM))
+        p.fillRect(QRectF(0, 0, w, h), g)
     s = h * frac
-    draw_icon(p, (w - s) / 2, (h - s) / 2, s)
+    draw_icon(p, (w - s) / 2, (h - s) / 2, s, square=not plated)
     p.end()
     return img
 
@@ -79,9 +96,8 @@ def main(out: str) -> list[str]:
         save(render(w, h, frac), f"{name}.png")
         save(render(w * 2, h * 2, frac), f"{name}.scale-200.png")
     for n in TARGET_SIZES:
-        img = render(n, n, 1.0)
-        save(img, f"Square44x44Logo.targetsize-{n}.png")
-        save(img, f"Square44x44Logo.targetsize-{n}_altform-unplated.png")
+        save(render(n, n, 1.0), f"Square44x44Logo.targetsize-{n}.png")
+        save(render(n, n, 1.0, plated=False), f"Square44x44Logo.targetsize-{n}_altform-unplated.png")
     return written
 
 

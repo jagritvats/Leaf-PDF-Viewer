@@ -47,7 +47,7 @@
       <uap:VisualElements
         DisplayName="{{DISPLAY_NAME}}"
         Description="Edit, sign and redact PDF files on your computer."
-        BackgroundColor="transparent"
+        BackgroundColor="#2fa84f"
         Square150x150Logo="Assets\Square150x150Logo.png"
         Square44x44Logo="Assets\Square44x44Logo.png">
         <uap:DefaultTile
@@ -75,7 +75,7 @@
       <uap:VisualElements
         DisplayName="Leaf (command line)"
         Description="Leaf command line"
-        BackgroundColor="transparent"
+        BackgroundColor="#2fa84f"
         Square150x150Logo="Assets\Square150x150Logo.png"
         Square44x44Logo="Assets\Square44x44Logo.png"
         AppListEntry="none"/>
