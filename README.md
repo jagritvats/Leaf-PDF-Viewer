@@ -33,7 +33,7 @@ with MuPDF's built-in Tesseract and the bundled English data (`leaf/data/tessdat
 CI builds and self-tests all three on every push; pushing a `v*` tag (or running the workflow manually) also builds
 the OCR variants, and a tag drafts a GitHub release with the files. Unsigned builds trigger SmartScreen (Windows) and
 Gatekeeper (macOS: right-click › Open) warnings until you add code signing (Windows certificate; Apple Developer ID +
-notarization). Distributing any build means meeting MuPDF's AGPL (offer Leaf's source) or holding an Artifex license.
+notarization). Leaf is AGPL-3.0, like MuPDF: anyone distributing a build must offer the matching source.
 
 ## What it does
 
@@ -138,9 +138,13 @@ Coordinates: overlays live in the source page's display space (`page.rect`); `ap
   (the .pdf registration); a portable run adds them to Windows' Recent files only.
 - Copying or duplicating a page brings its original annotations, not unsaved edits to them; thumbnails don't show overlays.
 - Links made in Leaf are invisible rectangles (no border), one per selected line; existing links can be retargeted or deleted but not moved or resized. Links and bookmarks whose target page is deleted are left out when saving (a bookmark that still has children stays, without a target). Rename/description edits apply to embedded files, not to file-attachment comments.
-- License: PyMuPDF/MuPDF is AGPL. Fine for personal or open-source use; a closed-source distribution needs an Artifex license.
 
 ## Roadmap
 
 - Done: phase 1 (view, annotate, forms, signatures, pages), phase 2 (redaction, digital signatures, OCR, compression, crop), phase 3 MVP (edit existing text, single lines and paragraphs).
 - Next: reading order for edited text (tagged PDF structure), editing Indic/Arabic text (needs shaping-aware re-encoding), Windows certificate store / smart cards for signing, LTV (B-LT) signatures, mobile via a mupdf.js web app (see packaging/PLATFORMS.md).
+
+## License
+
+Leaf is free software under the [GNU Affero General Public License v3.0 or later](LICENSE), the same license as the
+MuPDF engine it is built on. The bundled English OCR data is Apache-2.0 ([leaf/data/tessdata](leaf/data/tessdata/README.md)).

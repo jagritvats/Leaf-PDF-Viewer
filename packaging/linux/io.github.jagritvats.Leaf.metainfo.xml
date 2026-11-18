@@ -16,8 +16,7 @@
 <component type="desktop-application">
   <id>io.github.jagritvats.Leaf</id>
   <metadata_license>CC0-1.0</metadata_license>
-  <!-- TODO: <project_license>...</project_license> once Leaf's license is chosen (it bundles MuPDF, AGPL-3.0,
-       so AGPL-3.0-or-later unless an Artifex commercial license is bought). Flathub requires this tag. -->
+  <project_license>AGPL-3.0-or-later</project_license>
 
   <name>Leaf</name>
   <summary>Edit, sign and redact PDF files on your computer</summary>

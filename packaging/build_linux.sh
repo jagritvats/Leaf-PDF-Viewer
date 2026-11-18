@@ -35,7 +35,7 @@ LEAF_SELFTEST_LOG="$PWD/$DIST/selftest.log" "./$DIST/Leaf/leaf" --self-test
 STAGE=dist/leaf-$VERSION-linux-x86_64$SUFFIX
 rm -rf "$STAGE" && mkdir -p "$STAGE"
 cp -r "$DIST/Leaf" "$STAGE/leaf"
-cp "$DESKTOP" "$METAINFO" "$STAGE/"
+cp "$DESKTOP" "$METAINFO" LICENSE "$STAGE/"
 for px in 64 128 256 512; do
   install -Dm644 "build/icons/leaf-$px.png" "$STAGE/icons/hicolor/${px}x${px}/apps/$APP_ID.png"
 done

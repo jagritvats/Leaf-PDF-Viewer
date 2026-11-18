@@ -5,7 +5,7 @@
 # provides/conflicts let a later from-source "leaf-pdf" replace it. The plain name "leaf" is taken by other
 # software, hence "leaf-pdf".
 #
-# Before publishing: python packaging/set_app_id.py GITHUB_OWNER (app id + URLs), set the license, then
+# Before publishing: python packaging/set_app_id.py GITHUB_OWNER (app id + URLs), then
 #   updpkgsums && makepkg --printsrcinfo > .SRCINFO && namcap PKGBUILD && makepkg -si
 # and push PKGBUILD + .SRCINFO to ssh://aur@aur.archlinux.org/leaf-pdf-bin.git
 pkgname=leaf-pdf-bin
@@ -15,9 +15,7 @@ pkgrel=1
 pkgdesc="Fast, local PDF editor: edit text, redact, fill and sign forms, digital signatures, OCR"
 arch=('x86_64')
 url="https://github.com/jagritvats/Leaf-PDF-Viewer"
-# TODO: Leaf's license is not chosen yet. It bundles MuPDF (AGPL-3.0), so likely 'AGPL-3.0-or-later';
-# then also install the license text (see package()).
-license=('LicenseRef-TODO')
+license=('AGPL-3.0-or-later')
 # Qt's platform plugins inside the bundle link these system libraries (Wayland and X11/xcb)
 depends=(
   'glibc'
@@ -63,5 +61,5 @@ SH
     install -Dm644 "icons/hicolor/${size}x${size}/apps/$_appid.png" \
       "$pkgdir/usr/share/icons/hicolor/${size}x${size}/apps/$_appid.png"
   done
-  # TODO once licensed: install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
 }

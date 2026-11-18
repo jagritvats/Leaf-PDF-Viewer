@@ -72,7 +72,7 @@ def test_metainfo_required_tags():
     text = ET.tostring(desc, encoding="unicode").lower()
     for claim in ("redact", "sign", "ocr", "edit existing text", "pages"):
         assert claim in text, claim
-    assert "open source" not in text and "open-source" not in text  # no license chosen yet
+    assert root.findtext("project_license") == "AGPL-3.0-or-later"
     assert root.find("launchable[@type='desktop-id']").text == f"{APP_ID}.desktop"
     assert root.find("provides/binary").text == "leaf"
     assert root.find("provides/mediatype").text == "application/pdf"
