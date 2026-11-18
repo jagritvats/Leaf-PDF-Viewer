@@ -2,6 +2,12 @@
 
 A fast, local PDF editor. Native Qt 6 UI (follows Windows 11 / KDE / GNOME light and dark themes), MuPDF engine. Nothing leaves your machine.
 
+![Leaf in dark mode: a report with highlights and a comment thread](docs/screenshots/annotate-dark.png)
+
+![Editing existing text in place, light mode](docs/screenshots/edit-text-light.png)
+
+Downloads: [Releases](https://github.com/jagritvats/Leaf-PDF-Viewer/releases). Contributing: [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## Run
 
 ```sh
