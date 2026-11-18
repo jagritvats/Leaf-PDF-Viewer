@@ -18,6 +18,8 @@ import threading
 import time
 import traceback
 
+from .safeopen import is_network_path
+
 SERVER_NAME = "leaf"
 SUPPORTED_VERSIONS = ("2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05")
 MAX_TEXT = 200_000  # characters of text returned by one call unless max_chars asks for more
@@ -74,7 +76,7 @@ class Paths:
         p = p.strip()
         if re.match(r"^[A-Za-z][A-Za-z0-9+.\-]*://", p):
             raise ToolError(f"{what}: URLs aren't accepted, only local file paths")
-        if p.startswith(("\\\\", "//")):
+        if is_network_path(p):  # every UNC spelling (\/host/share too), before realpath() opens the share
             raise ToolError(f"{what}: network paths aren't accepted")
         if not os.path.isabs(p) or (sys.platform == "win32" and not os.path.splitdrive(p)[0]):
             raise ToolError(f"{what}: use an absolute path (got {p!r})")

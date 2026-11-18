@@ -273,6 +273,19 @@ def test_auto_accept_and_invalid_edits(app, server, doc_win):  # noqa: F811
     assert not outside["ok"]
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows path forms")
+def test_agent_paths_refuse_every_unc_spelling(app, server, doc_win):  # noqa: F811
+    # "\/host/share" and "/\host\share" are UNC paths to Windows too (an SMB connection sends the NTLM hash)
+    for unc in (r"\/leaf-test.invalid/share/x.png", r"/\leaf-test.invalid\share\x.png"):
+        assert AL.check_file_refs({"images": [{"file": unc}]}) == [f"file {unc!r}: agents must use absolute local paths"]
+    tok = AL.read_token_file()["token"]
+    r = in_thread(app, lambda: ipc.request({"op": "propose", "token": tok, "path": r"\/leaf-test.invalid/s/x.pdf",
+                                            "open": True, "edits": EDITS}, server.name))
+    assert not r["ok"] and "isn't open" in r["error"]
+    msgs = run_mcp(app, [*init_msgs(), call(2, "pdf_info", {"path": r"\/leaf-test.invalid/share/x.pdf"})])
+    assert "network paths aren't accepted" in result_of(msgs, 2)["result"]["content"][0]["text"]
+
+
 # ============================================================== MCP
 class Pipe:
     """A blocking in-memory line pipe (stdin of the server)."""
