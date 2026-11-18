@@ -53,7 +53,7 @@ gambling, user interaction/chat, sharing location and purchases. That gives the 
 
 **Store listing (English)**
 - Description: the *Store: full description* in the promo copy deck (`marketing/promo/make_promo.py` writes it to
-  `marketing/out/promo/COPY.md`). Mention 0.2.0's new look and Focus mode in *What's new in this version*.
+  `marketing/out/promo/COPY.md`). Summarize the release notes in *What's new in this version*.
 - Short description: the *Store: short description* from the same file.
 - Screenshots: 1920×1080 PNGs, up to 10. Use `marketing/shots/shoot_all.py` to render them from fictional demo
   documents only.

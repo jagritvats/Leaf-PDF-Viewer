@@ -121,6 +121,13 @@
   </supports>
 
   <releases>
+    <release version="0.2.1" date="2026-11-18">
+      <description>
+        <p>Fixes Leaf using a full CPU core while idle, menu commands (Presentation, page modes, night mode) staying
+        disabled after startup, Focus mode combined with full screen or presentations, the keyboard shortcuts
+        dialog, clipped dialog buttons and settings notes after a theme switch.</p>
+      </description>
+    </release>
     <release version="0.2.0" date="2026-11-18">
       <description>
         <p>A new look that follows Windows 11 and your accent color, a start screen that shows your recent files as

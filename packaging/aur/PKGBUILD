@@ -10,7 +10,7 @@
 # and push PKGBUILD + .SRCINFO to ssh://aur@aur.archlinux.org/leaf-pdf-bin.git
 pkgname=leaf-pdf-bin
 _appid=io.github.jagritvats.Leaf
-pkgver=0.2.0
+pkgver=0.2.1
 pkgrel=1
 pkgdesc="Fast, local PDF editor: edit text, redact, fill and sign forms, digital signatures, OCR"
 arch=('x86_64')
