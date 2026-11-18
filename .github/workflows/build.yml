@@ -17,6 +17,10 @@ on:
         type: boolean
         default: true
 
+# The token is read-only unless a job asks for more (only "release" does).
+permissions:
+  contents: read
+
 concurrency:
   group: build-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -29,6 +33,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Tools
         run: |
           sudo apt-get update
@@ -59,6 +65,8 @@ jobs:
       BUILD_OCR: ${{ startsWith(github.ref, 'refs/tags/v') || inputs.ocr == true }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: astral-sh/setup-uv@v6
         with:
           python-version: "3.12"

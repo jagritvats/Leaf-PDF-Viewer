@@ -341,6 +341,37 @@ def test_attachments_open_warns_for_programs_and_lists_annotations(app, tmp_path
     assert [r[0] for r in panel.rows] == ["file", "annot"]
 
 
+def test_attachment_names_cant_hide_programs_and_copies_are_marked(app, tmp_path, monkeypatch):
+    path = str(tmp_path / "a.pdf")
+    doc_pdf(path, files=False, toc=False)
+    d = pymupdf.open(path)
+    # Windows drops trailing dots/spaces and Leaf drops control characters: each is written as an .exe
+    for key, name in (("a", "tool.exe."), ("b", "too\x01l.exe"), ("c", "tool.exe . "), ("d", "help.chm")):
+        d.embfile_add(key, b"MZ", filename=name, ufilename=name)
+    d.embfile_add("e", b"hello", filename="readme.txt", ufilename="readme.txt")
+    d.saveIncr()
+    d.close()
+    c = canvas_for(path)
+    panel = AT.AttachmentsPanel(c)
+    panel.refresh()
+    asked, opened = [], []
+    monkeypatch.setattr(AT, "confirm_risky", lambda parent, name: asked.append(name) or False)
+    monkeypatch.setattr(AT, "open_url", lambda url: opened.append(url.toLocalFile()) or True)
+    rows = {r[1].name: r for r in panel.rows}
+    for name in ("tool.exe.", "too\x01l.exe", "tool.exe . ", "help.chm"):
+        assert panel.open_row(rows[name]) is None, name
+    assert len(asked) == 4 and not opened
+    p = panel.open_row(rows["readme.txt"])
+    assert p and os.path.basename(p) == "readme.txt" and not asked[4:]
+    target = tmp_path / "saved.txt"
+    monkeypatch.setattr(AT, "ask_save_path", lambda parent, name: str(target))
+    panel.save_row(rows["readme.txt"])
+    if os.name == "nt":  # Mark of the Web: SmartScreen / Protected View treat them as downloaded
+        for f in (p, str(target)):
+            with open(f + ":Zone.Identifier", encoding="ascii") as z:
+                assert "ZoneId=3" in z.read()
+
+
 # ------------------------------------------------------------------------------------------------ window
 def test_window_link_tool_insert_link_bookmark_and_attachments(app, tmp_path, monkeypatch):
     from tests.test_viewing import close_win, isolated, open_win  # noqa: F401

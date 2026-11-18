@@ -430,6 +430,28 @@ def test_mcp_apply_to_copy_and_propose_fallback(app, sandbox, tmp_path):  # noqa
     assert result_of(msgs, 4)["result"]["isError"]
 
 
+def test_mcp_copies_never_overwrite_a_file_that_appears_meanwhile(app, sandbox, tmp_path, monkeypatch):  # noqa: F811
+    pdf = str(tmp_path / "doc.pdf")
+    make_pdf(pdf, form=False)
+    real_new_out = mcp_server.Paths.new_out
+
+    def racing_new_out(self, src, output, suffix, ext=".pdf"):
+        out = real_new_out(self, src, output, suffix, ext)
+        with open(out, "wb") as f:  # another process (or a planted link) takes the name after the check
+            f.write(b"precious")
+        return out
+
+    monkeypatch.setattr(mcp_server.Paths, "new_out", racing_new_out)
+    msgs = run_mcp(app, [*init_msgs(), call(2, "pdf_export_text", {"path": pdf}),
+                         call(3, "pdf_redact_to_copy", {"path": pdf, "query": "quick", "confirm": True}),
+                         call(4, "pdf_apply_edits_to_copy", {"path": pdf, "edits": EDITS})])
+    for i, name in ((2, "doc-text.txt"), (3, "doc-redacted.pdf"), (4, "doc-edited.pdf")):
+        r = result_of(msgs, i)["result"]
+        assert r.get("isError") and "already exists" in r["content"][0]["text"], (i, r)
+        assert (tmp_path / name).read_bytes() == b"precious"
+    assert not [n for n in os.listdir(tmp_path) if n.startswith(".leaf-")]  # no temp files left behind
+
+
 def test_mcp_propose_reaches_running_leaf(app, server, doc_win):  # noqa: F811
     w = doc_win
     msgs = run_mcp(app, [*init_msgs(), call(2, "pdf_propose_edits", {"path": w.canvas.doc.path, "edits": EDITS,

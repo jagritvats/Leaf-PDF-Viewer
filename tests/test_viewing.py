@@ -110,6 +110,85 @@ def test_uri_link_needs_confirmation(app, lpdf, monkeypatch):
     assert opened and opened[0].toString() == "https://example.com/x"
 
 
+def _malicious_links_pdf(path, folder):
+    """One page, one link per action: (label, PDF action dictionary)."""
+    exe = os.path.join(folder, "payload.exe")
+    open(exe, "wb").write(b"MZ")
+    open(os.path.join(folder, "notes.txt"), "w").write("hi")
+    open(os.path.join(folder, "data.xyz"), "w").write("hi")
+    fwd = exe.replace("\\", "/")
+    acts = {
+        "web": "<</S/URI/URI(https://example.com/a)>>",
+        "mail": "<</S/URI/URI(mailto:a@example.com)>>",
+        "file-uri-exe": f"<</S/URI/URI(file:///{fwd})>>",
+        "launch-exe": "<</S/Launch/F(payload.exe)>>",
+        "launch-exe-dot": "<</S/Launch/F(payload.exe.)>>",
+        "launch-abs-exe": f"<</S/Launch/F({pymupdf.get_pdf_str(exe)[1:-1]})>>",
+        "launch-bat": "<</S/Launch/F(run.bat)>>",
+        "launch-unc": "<</S/Launch/F<</Type/Filespec/F(//attacker/share/x.pdf)/UF(//attacker/share/x.pdf)>>>>",
+        "uri-unc": "<</S/URI/URI(file://attacker/share/x.pdf)>>",
+        "msdt": "<</S/URI/URI(ms-msdt:/id PCWDiagnostic)>>",
+        "search-ms": "<</S/URI/URI(search-ms:query=x&crumb=location:\\\\\\\\attacker\\\\s)>>",
+        "js": "<</S/URI/URI(javascript:alert(1))>>",
+        "custom": "<</S/URI/URI(zoommtg://join?x=1)>>",
+        "missing": "<</S/GoToR/F(nothere.pdf)/D[0/Fit]>>",
+        "txt": "<</S/Launch/F(notes.txt)>>",
+        "unknown": "<</S/Launch/F(data.xyz)>>",
+    }
+    d = pymupdf.open()
+    p = d.new_page()
+    xrefs = []
+    for i, a in enumerate(acts.values()):
+        x = d.get_new_xref()
+        d.update_object(x, f"<</Type/Annot/Subtype/Link/Rect[10 {10 + i * 20} 100 {25 + i * 20}]/Border[0 0 0]/A{a}>>")
+        xrefs.append(x)
+    d.xref_set_key(p.xref, "Annots", "[" + " ".join(f"{x} 0 R" for x in xrefs) + "]")
+    d.save(path)
+    d.close()
+    return list(acts)
+
+
+def test_links_to_programs_network_and_handlers_are_refused(app, tmp_path, monkeypatch):
+    path = str(tmp_path / "evil.pdf")
+    labels = _malicious_links_pdf(path, str(tmp_path))
+    c = make_canvas(path)
+    asked, refused, opened = [], [], []
+    c.confirm_external = lambda t, warning="": asked.append((t, warning)) or True
+    c.refuse_external = lambda msg: refused.append(msg)
+    monkeypatch.setattr("leaf.canvas.QDesktopServices.openUrl", lambda url: opened.append(url))
+    pg = c.order[0]
+    links = sorted(c.links_on(pg), key=lambda rl: -rl[0].top())  # PDF y grows upwards: the first action is lowest
+    assert len(links) == len(labels)
+    seen = {}
+    for label, (_, ln) in zip(labels, links):
+        asked.clear(), refused.clear(), opened.clear()
+        c.follow_link(pg, ln)
+        seen[label] = ("block" if refused else "warn" if asked and asked[0][1] else "open" if asked else "none",
+                       [u.toString() for u in opened])
+    for label in ("file-uri-exe", "launch-exe", "launch-exe-dot", "launch-abs-exe", "launch-bat", "launch-unc",
+                  "uri-unc", "msdt", "search-ms", "js", "missing"):
+        assert seen[label] == ("block", []), (label, seen[label])
+    assert seen["web"] == ("open", ["https://example.com/a"])
+    assert seen["mail"] == ("open", ["mailto:a@example.com"])
+    assert seen["custom"][0] == "warn" and seen["custom"][1] == ["zoommtg://join?x=1"]
+    assert seen["txt"][0] == "open" and seen["txt"][1][0].endswith("/notes.txt")
+    assert seen["unknown"][0] == "warn"
+
+
+def test_safeopen_names_and_paths():
+    from leaf import safeopen as S
+
+    assert S.is_risky("a.exe") and S.is_risky("a.EXE. ") and S.is_risky("a.ex\x00e") and S.is_risky("x.chm")
+    assert S.is_risky("invoice\u202efdp.exe") and not S.is_risky("report.pdf")
+    assert S.safe_filename("..\\..\\a.exe.") == "a.exe" and S.safe_filename("a\x01.pdf") == "a.pdf"
+    assert S.safe_filename("evil\u202egpj.exe") == "evilgpj.exe" and S.safe_filename("...") == "attachment"
+    assert S.shown("a\u202eb") == "a\\u202eb"
+    if os.name == "nt":
+        for p in (r"\\srv\s\x.pdf", r"\/srv/s/x.pdf", "//srv/s/x.pdf", r"\\?\UNC\srv\s\x.pdf", r"\??\UNC\srv\s\x"):
+            assert S.is_network_path(p), p
+        assert S.is_risky("a.exe::$DATA") and not S.is_network_path(r"C:\x.pdf")
+
+
 def test_go_to_history_only_for_jumps(app, lpdf):
     c = make_canvas(lpdf)
     c.go_to(1)

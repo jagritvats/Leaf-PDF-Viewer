@@ -65,7 +65,11 @@ ASSETS = ("chevron_down", "chevron_up", "chevron_right", "chevron_down_muted", "
 def _asset_dir(t: Tokens) -> str:
     key = hashlib.sha1(f"{t.dark}{t.accent.name()}{t.on_accent.name()}{t.text.name()}{t.text2.name()}{t.input.name()}"
                        "v4".encode()).hexdigest()[:10]
-    d = os.path.join(tempfile.gettempdir(), "leaf-style", key)
+    if sys.platform == "win32":  # %TEMP% is per user here
+        d = os.path.join(tempfile.gettempdir(), "leaf-style", key)
+    else:  # /tmp is shared by every user, who could plant images there or squat the folder: the user's cache
+        cache = os.environ.get("XDG_CACHE_HOME") or os.path.join(os.path.expanduser("~"), ".cache")
+        d = os.path.join(cache, "leaf", "style", key)
     os.makedirs(d, exist_ok=True)
     return d
 

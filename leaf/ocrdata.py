@@ -161,11 +161,25 @@ def _ssl_context():
     return ctx
 
 
+def _https_only_handler():
+    """urllib follows redirects to http:// (and ftp://) too; GitHub's raw links redirect, so each hop is checked."""
+    import urllib.request
+
+    class HttpsOnlyRedirects(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, req, fp, code, msg, headers, newurl):
+            if not str(newurl).lower().startswith("https://"):
+                raise DownloadError(f"The download was redirected to a non-HTTPS address ({newurl})")
+            return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+    return HttpsOnlyRedirects()
+
+
 def _open(url: str):
     import urllib.request
 
     req = urllib.request.Request(url, headers={"User-Agent": "Leaf-PDF-editor"})
-    return urllib.request.urlopen(req, timeout=TIMEOUT, context=_ssl_context())
+    opener = urllib.request.build_opener(urllib.request.HTTPSHandler(context=_ssl_context()), _https_only_handler())
+    return opener.open(req, timeout=TIMEOUT)
 
 
 def download(code: str, dest: str, progress=None, cancelled=None, opener=None) -> str:
