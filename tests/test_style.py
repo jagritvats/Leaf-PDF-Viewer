@@ -102,6 +102,23 @@ def test_style_sheet_changes_no_font_in_a_state(app):  # noqa: F811
         assert not bad, bad
 
 
+def test_style_images_are_cached_per_user_off_the_shared_temp(app, tmp_path, monkeypatch):  # noqa: F811
+    """On Linux /tmp is shared: another user could pre-create /tmp/leaf-style/<key> with their own images (or a
+    file of that name, so Leaf fails at start). The images are cached in the user's own cache folder instead."""
+    import sys
+    import tempfile
+
+    from leaf.style import theme, tokens
+
+    monkeypatch.setattr(sys, "platform", "linux")
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+    monkeypatch.setattr(tempfile, "gettempdir", lambda: str(tmp_path / "shared-tmp"))
+    paths = theme.make_assets(tokens.build(False, None))
+    assert all(os.path.isfile(p) for p in paths.values())
+    assert all(os.path.normpath(p).startswith(str(tmp_path / "cache" / "leaf")) for p in paths.values())
+    assert not os.path.exists(tmp_path / "shared-tmp")
+
+
 def test_page_hits_ignore_the_shadow_margin(app, windows, doc):  # noqa: F811
     win = windows()
     open_in(win, doc)
