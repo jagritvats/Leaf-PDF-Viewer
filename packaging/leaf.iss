@@ -57,6 +57,8 @@ Root: HKA; Subkey: "Software\Classes\Leaf.pdf"; ValueType: string; ValueName: "A
 Root: HKA; Subkey: "Software\Classes\Leaf.pdf\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\Leaf.exe,0"
 Root: HKA; Subkey: "Software\Classes\Leaf.pdf\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\Leaf.exe"" ""%1"""
 Root: HKA; Subkey: "Software\Classes\.pdf\OpenWithProgids"; ValueType: string; ValueName: "Leaf.pdf"; ValueData: ""; Flags: uninsdeletevalue
+; (uninstall runs these in reverse: the empty parent key goes after its SupportedTypes subkey)
+Root: HKA; Subkey: "Software\Classes\Applications\Leaf.exe"; Flags: uninsdeletekeyifempty
 Root: HKA; Subkey: "Software\Classes\Applications\Leaf.exe\SupportedTypes"; ValueType: string; ValueName: ".pdf"; ValueData: ""; Flags: uninsdeletekey
 
 [Run]
