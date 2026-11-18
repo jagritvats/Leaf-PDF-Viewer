@@ -306,13 +306,30 @@ class Viewing:
             x.hide()
         return state
 
-    @staticmethod
-    def _unhide(state: dict) -> None:
+    def _unhide(self, state: dict) -> None:
+        fm = getattr(self.win, "focus_mode", None)
+        if fm is not None and fm.on:  # Focus mode shows its part of it when it ends (not over Focus mode now)
+            state = fm.hand_over(state)
         for x, vis in state.items():
             try:
                 x.setVisible(vis)
             except RuntimeError:  # widget deleted meanwhile
                 pass
+
+    def hold(self, widgets: list) -> list:
+        """Focus mode ends during full screen or a presentation: what they hid stays hidden until they end (and is
+        shown then). Returns the widgets to show now."""
+        st = self._present_state or self._screen_state
+        if st is None:
+            return list(widgets)
+        hidden = st[1]
+        now = []
+        for x in widgets:
+            if x in hidden:
+                hidden[x] = True
+            else:
+                now.append(x)
+        return now
 
     def toggle_full_screen(self, on: bool) -> None:
         w = self.win

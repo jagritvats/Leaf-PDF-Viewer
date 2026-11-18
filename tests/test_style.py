@@ -215,6 +215,31 @@ def test_focus_mode_hides_bars_while_presenting(app, windows, doc):  # noqa: F81
     win.a_focus_mode.trigger()
 
 
+@pytest.mark.parametrize("steps", [
+    ("focus", "full", "focus", "full"),  # leaving Focus mode while full screen
+    ("full", "focus", "full", "focus"),  # leaving full screen while in Focus mode
+    ("focus", "present", "focus", "present"),
+    ("present", "focus", "present", "focus"),
+])
+def test_focus_mode_with_full_screen_and_presenting(app, windows, doc, steps):  # noqa: F811
+    """Each one puts back what it hid, in either order. Leaving Focus mode in full screen, then full screen, lost
+    the menu bar, toolbars and status bar; leaving full screen in Focus mode put them over Focus mode."""
+    win = windows()
+    open_in(win, doc)
+    before = _chrome(win)
+    acts = {"focus": win.a_focus_mode, "full": win.viewing.a_fullscreen, "present": win.a_presentation}
+    for i, s in enumerate(steps):
+        if s == "present" and win.canvas.presenting:
+            win.viewing.exit_presentation()
+        else:
+            acts[s].trigger()
+        pump(0.05)
+        if i == 2:  # one of the two still on
+            assert not any(_chrome(win)[k] for k in ("menu", "toolbar", "status")), (steps, _chrome(win))
+    assert not win.focus_mode.on and not win.canvas.presenting and not win.isFullScreen()
+    assert _chrome(win) == before
+
+
 # ------------------------------------------------------------------ start screen
 def test_start_screen_recent_open_and_clear(app, windows, tmp_path):  # noqa: F811
     paths = []
