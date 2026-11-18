@@ -148,6 +148,26 @@ def test_workflow_parses_and_has_packaging_steps():
     assert "\b" not in _read(".github", "workflows", "build.yml")
 
 
+def test_workflow_token_is_read_only_by_default():
+    """Only the release job may write (draft releases); builds of pull requests run untrusted code."""
+    yaml = pytest.importorskip("yaml")
+    wf = yaml.safe_load(_read(".github", "workflows", "build.yml"))
+    assert wf["permissions"] == {"contents": "read"}
+    assert "pull_request_target" not in (wf.get("on") or wf.get(True))
+    for name, job in wf["jobs"].items():
+        assert name == "release" or "permissions" not in job, name
+        for s in job["steps"]:
+            if s.get("uses", "").startswith("actions/checkout"):
+                assert s["with"]["persist-credentials"] is False, name
+
+
+def test_installer_dir_follows_install_mode():
+    """{autopf}: the user's Programs folder per user, Program Files when installed for all users. A machine-wide
+    install (HKLM file association) must not run Leaf.exe from a folder the installing user can change."""
+    iss = _read("packaging", "leaf.iss")
+    assert "DefaultDirName={autopf}\\Leaf" in iss and "{localappdata}" not in iss
+
+
 def test_validate_script_reads_app_id():
     sh = _read("packaging", "linux", "validate.sh")
     assert "appstreamcli validate --no-net" in sh
