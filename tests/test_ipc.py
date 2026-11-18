@@ -113,6 +113,12 @@ def test_second_server_defers_and_stale_socket_is_cleaned(app, sandbox, tmp_path
     assert third.listen()
     assert in_thread(app, lambda: ipc.request({"op": "ping"}, name))["ok"]
     third.close()
+    # let the closed pipes' pending notifications run while the servers still exist (dropping them here left
+    # freed objects for a later event-loop turn: an access violation in whichever test activated a window next)
+    pump(app, 0.1)
+    for srv in (first, second, third):
+        srv.deleteLater()
+    pump(app, 0.05)
 
 
 def test_open_in_running_reuses_and_creates_windows(app, sandbox, tmp_path):  # noqa: F811
