@@ -31,11 +31,12 @@ uv run --no-sync pyinstaller --noconfirm --log-level WARN --distpath "$DIST" --w
 LEAF_SELFTEST_LOG="$PWD/$DIST/selftest.log" "./$DIST/Leaf/leaf" --self-test
 
 # tarball: app folder + desktop entry + AppStream metadata + icons. The Flatpak manifest and the AUR PKGBUILD
-# install from this layout: leaf/, <app-id>.desktop, <app-id>.metainfo.xml, icons/hicolor/<n>x<n>/apps/<app-id>.png
+# install from this layout: leaf/, <app-id>.desktop, <app-id>.metainfo.xml, icons/hicolor/<n>x<n>/apps/<app-id>.png,
+# leaf-combine.desktop (KDE Dolphin service menu: Combine with Leaf)
 STAGE=dist/leaf-$VERSION-linux-x86_64$SUFFIX
 rm -rf "$STAGE" && mkdir -p "$STAGE"
 cp -r "$DIST/Leaf" "$STAGE/leaf"
-cp "$DESKTOP" "$METAINFO" LICENSE "$STAGE/"
+cp "$DESKTOP" "$METAINFO" LICENSE packaging/linux/leaf-combine.desktop "$STAGE/"
 for px in 64 128 256 512; do
   install -Dm644 "build/icons/leaf-$px.png" "$STAGE/icons/hicolor/${px}x${px}/apps/$APP_ID.png"
 done

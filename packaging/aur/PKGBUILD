@@ -61,5 +61,9 @@ SH
     install -Dm644 "icons/hicolor/${size}x${size}/apps/$_appid.png" \
       "$pkgdir/usr/share/icons/hicolor/${size}x${size}/apps/$_appid.png"
   done
+  # Dolphin: right-click PDFs > Combine with Leaf (tarballs from 0.2.2 on)
+  if [ -f leaf-combine.desktop ]; then
+    install -Dm644 leaf-combine.desktop "$pkgdir/usr/share/kio/servicemenus/leaf-combine.desktop"
+  fi
   install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
 }

@@ -4,7 +4,9 @@ One per-user local server (QLocalServer: a named pipe on Windows, a Unix socket 
 restricted to this user). Messages are newline-delimited JSON objects; each request gets one response line.
 
 - `{"op": "ping"}` -> `{"ok": true, "pid": ..., "app": "leaf"}`
-- `{"open": ["/abs/a.pdf", ...]}` -> opens each file in the running Leaf (or raises it when the list is empty)
+- `{"open": ["/abs/a.pdf", ...]}` -> opens each file in the running Leaf (or raises it when the list is empty);
+  with `"merge": true` (`leaf --merge`, Explorer's "Combine with Leaf") the files are gathered for a moment and
+  opened together as one new untitled document (Explorer starts one process per selected file)
 - everything else is handled by leaf.agentlink (token required).
 
 The client half (`request`, `forward_open`) is plain Python (no Qt), so `leaf file.pdf` can hand its files to a
@@ -206,9 +208,10 @@ def _allow_foreground(pid) -> None:
 
 
 def forward_open(paths: list[str], name: str | None = None, timeout: float = CONNECT_TIMEOUT,
-                 new_window: bool = False) -> bool:
+                 new_window: bool = False, merge: bool = False) -> bool:
     """Hand `paths` (made absolute here: the running Leaf has another working directory) to a running Leaf;
-    `new_window` (`leaf --new-window`) also opens an empty window there.
+    `new_window` (`leaf --new-window`) also opens an empty window there; `merge` (`leaf --merge`) adds them to
+    the document being combined.
 
     True when it took them (this process should exit), False when there's no Leaf to talk to (start normally)."""
     absolute = [os.path.abspath(p) for p in paths]
@@ -221,6 +224,8 @@ def forward_open(paths: list[str], name: str | None = None, timeout: float = CON
             msg = {"open": absolute}
             if new_window:
                 msg["new_window"] = True
+            if merge:
+                msg["merge"] = True
             r = c.request(msg)
             return bool(r.get("ok"))
     except IpcError:
@@ -254,6 +259,7 @@ def _server_class():
             self.server.newConnection.connect(self._accept)
             self.handlers: dict = {"ping": _ping, "open": _open}
             self.on_open = None  # callable(paths) override (tests); default opens windows
+            self.on_merge = None  # callable(paths) override (tests); default: queue_merge
             self.conns: list = []
 
         def listen(self) -> bool:
@@ -332,7 +338,9 @@ def _server_class():
             return {"ok": False, "error": "open: expected a list of paths"}
         paths = [os.path.abspath(p) for p in paths]
         # after the response: opening may show a dialog (password, error) with its own event loop
-        if req.get("new_window") and server.on_open is None:
+        if req.get("merge"):
+            QTimer.singleShot(0, lambda: (server.on_merge or queue_merge)(paths))
+        elif req.get("new_window") and server.on_open is None:
             QTimer.singleShot(0, lambda: open_in_running(paths, new_window=True))
         else:
             QTimer.singleShot(0, lambda: (server.on_open or open_in_running)(paths))
@@ -434,3 +442,131 @@ def open_in_running(paths: list[str], new_window: bool = False):
         shown = next((w for w in _windows if w.canvas.doc is not None and w.canvas.doc.path == p), shown)
     activate(shown)
     return shown
+
+
+# --------------------------------------------------------------------------- combine (leaf --merge)
+MERGE_SETTLE_MS = 800  # Explorer's per-file launches arrive within this of each other
+_merge_batches: list[list[str]] = []
+_merge_timer = None
+
+
+def queue_merge(paths: list[str]) -> None:
+    """Add one launch's files to the document being combined; it opens MERGE_SETTLE_MS after the last one."""
+    global _merge_timer
+    from PySide6.QtCore import QTimer
+
+    _merge_batches.append([os.path.abspath(p) for p in paths])
+    if _merge_timer is None:
+        _merge_timer = QTimer()
+        _merge_timer.setSingleShot(True)
+        _merge_timer.timeout.connect(flush_merge)
+    _merge_timer.start(MERGE_SETTLE_MS)
+
+
+def flush_merge():
+    """Open what queue_merge gathered (now). Returns the window showing it, or None."""
+    from .shellint import merge_order
+
+    if _merge_timer is not None:
+        _merge_timer.stop()
+    batches = list(_merge_batches)
+    _merge_batches.clear()
+    files = merge_order(batches)
+    if not files:
+        return None
+    return open_merged_in_running(files)
+
+
+def open_merged_in_running(paths: list[str]):
+    """Open `paths` combined: in an empty window if there is one, else in a new window."""
+    from .window import MainWindow, _windows
+
+    live = [w for w in _windows if w.isVisible()]
+    target = next((w for w in reversed(live) if w.canvas.doc is None), None)
+    if target is None:
+        target = MainWindow()
+        target.show()
+    shown = target.open_merged(paths) or target
+    activate(shown)
+    return shown
+
+
+# --------------------------------------------------------------------------- startup lock
+class StartupLock:
+    """Serializes Leaf launches until the first one listens (Explorer starts one process per selected file, all
+    at once: without this each would find no running Leaf and open its own window).
+
+    Held from before `forward_open` until `start_server` returns; others wait (at most `timeout`) and then
+    forward to it. A crashed holder releases it (Windows: abandoned mutex; POSIX: the lock dies with the fd)."""
+
+    def __init__(self, name: str | None = None):
+        tag = hashlib.sha256((name or server_name()).encode("utf-8", "replace")).hexdigest()[:16]
+        self._name = f"leaf-start-{tag}"
+        self._handle = None
+        self._fd = None
+
+    def acquire(self, timeout: float = 10.0) -> bool:
+        try:
+            if sys.platform == "win32":
+                return self._acquire_win(timeout)
+            return self._acquire_posix(timeout)
+        except Exception:  # noqa: BLE001 - never block a launch over the lock
+            return False
+
+    def _acquire_win(self, timeout: float) -> bool:
+        import ctypes
+
+        k32 = ctypes.windll.kernel32
+        k32.CreateMutexW.restype = ctypes.c_void_p
+        k32.CreateMutexW.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_wchar_p]
+        k32.WaitForSingleObject.argtypes = [ctypes.c_void_p, ctypes.c_uint32]
+        k32.WaitForSingleObject.restype = ctypes.c_uint32
+        h = k32.CreateMutexW(None, 0, "Local\\" + self._name)
+        if not h:
+            return False
+        r = k32.WaitForSingleObject(h, int(timeout * 1000))
+        if r in (0, 0x80):  # WAIT_OBJECT_0, WAIT_ABANDONED (a holder crashed: ours now)
+            self._handle = h
+            return True
+        k32.CloseHandle.argtypes = [ctypes.c_void_p]
+        k32.CloseHandle(h)
+        return False
+
+    def _acquire_posix(self, timeout: float) -> bool:
+        import fcntl
+
+        run = os.environ.get("XDG_RUNTIME_DIR")
+        if not run or not os.path.isdir(run):
+            run = tempfile.gettempdir()
+        fd = os.open(os.path.join(run, self._name + ".lock"), os.O_RDWR | os.O_CREAT, 0o600)
+        end = time.monotonic() + timeout
+        while True:
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                self._fd = fd
+                return True
+            except OSError:
+                if time.monotonic() > end:
+                    os.close(fd)
+                    return False
+                time.sleep(0.02)
+
+    def release(self) -> None:
+        if self._handle is not None:
+            try:
+                import ctypes
+
+                k32 = ctypes.windll.kernel32
+                k32.ReleaseMutex.argtypes = [ctypes.c_void_p]
+                k32.CloseHandle.argtypes = [ctypes.c_void_p]
+                k32.ReleaseMutex(self._handle)
+                k32.CloseHandle(self._handle)
+            except Exception:  # noqa: BLE001
+                pass
+            self._handle = None
+        if self._fd is not None:
+            try:
+                os.close(self._fd)  # drops the flock
+            except OSError:
+                pass
+            self._fd = None
