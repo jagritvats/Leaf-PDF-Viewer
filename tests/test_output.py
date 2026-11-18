@@ -246,6 +246,21 @@ def test_xmp_and_dates():
     assert docprops.format_date("D:20231015123045Z").startswith("2023-10-15 12:30")
 
 
+def test_xmp_without_end_tag_doesnt_stall_saving():
+    """A file's metadata full of unclosed "<x:xmpmeta" made the lazy search quadratic (minutes per MB)."""
+    import time
+
+    hostile = "<x:xmpmeta " * 40_000 + "<rdf:RDF " * 40_000
+    t = time.perf_counter()
+    assert docprops.update_xmp(hostile, {"title": "x"}) is None
+    assert time.perf_counter() - t < 2
+    wrapped = '<?xpacket begin=""?>junk<x:xmpmeta ' + 'xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/' \
+              '1999/02/22-rdf-syntax-ns#"><rdf:Description rdf:about=""/></rdf:RDF></x:xmpmeta><?xpacket end="w"?>'
+    new = docprops.update_xmp(wrapped, {"title": "T"})
+    assert new.startswith('<?xpacket begin=""?>junk<x:xmpmeta') and new.endswith('</x:xmpmeta><?xpacket end="w"?>')
+    assert ">T<" in new
+
+
 # ---------------------------------------------------------------- security
 def test_encrypt_with_passwords_and_undo(app, pdf, tmp_path):  # noqa: F811
     c = canvas_for(pdf)

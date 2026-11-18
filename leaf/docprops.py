@@ -187,13 +187,24 @@ def _iso(pdf_date: str) -> str | None:
     return dt.isoformat() if dt else None
 
 
+def _element_span(xml: str, tag: str) -> tuple[int, int] | None:
+    """(start, end) of the first <tag ...>...</tag> in `xml`: what re.search(rf"<{tag}\\b.*?</{tag}>", xml, re.S)
+    finds, in linear time. (That pattern rescans to the end of the text from every "<tag" when the end tag is
+    missing: a few hundred KB of them in a file's metadata stalled saving for minutes.)"""
+    m = re.search(rf"<{re.escape(tag)}\b", xml)
+    if not m:
+        return None
+    end = xml.find(f"</{tag}>", m.start())
+    return (m.start(), end + len(tag) + 3) if end >= 0 else None
+
+
 def update_xmp(xml: str, edits: dict, mod_date: str | None = None) -> str | None:
     """`xml` with dc:title / dc:creator / dc:description / pdf:Keywords (and xmp:ModifyDate/MetadataDate if present)
     set from `edits`. The xpacket wrapper and other properties are left as they are. None if it can't be parsed."""
-    m = re.search(r"<x:xmpmeta\b.*?</x:xmpmeta>", xml, re.S) or re.search(r"<rdf:RDF\b.*?</rdf:RDF>", xml, re.S)
-    if not m:
+    span = _element_span(xml, "x:xmpmeta") or _element_span(xml, "rdf:RDF")
+    if not span:
         return None
-    frag = m.group(0)
+    frag = xml[span[0]:span[1]]
     try:
         import io
 
@@ -248,7 +259,7 @@ def update_xmp(xml: str, edits: dict, mod_date: str | None = None) -> str | None
                     d.set(tag, iso)
                 for e in d.findall(tag):
                     e.text = iso
-    return xml[:m.start()] + ET.tostring(root, encoding="unicode") + xml[m.end():]
+    return xml[:span[0]] + ET.tostring(root, encoding="unicode") + xml[span[1]:]
 
 
 # ------------------------------------------------------------------ commands
