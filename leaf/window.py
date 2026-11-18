@@ -687,6 +687,56 @@ class MainWindow(QMainWindow):
         if doc.primary.doc.is_form_pdf:
             self.toast("This document has form fields. Click a field to fill it in.", ms=4500)
 
+    def open_merged(self, paths: list[str]):
+        """Open several files as one new, unsaved document (Explorer's "Combine with Leaf", `leaf --merge`).
+        Save asks for a name. Returns the window showing it (None when nothing could be opened)."""
+        paths = [os.path.abspath(p) for p in paths]
+        if len(paths) == 1:
+            self.open_path(paths[0])
+            return next((w for w in _windows if w.canvas.doc and w.canvas.doc.path == paths[0]), self)
+        if self.canvas.doc is not None:
+            w = MainWindow()
+            w.show()
+            return w.open_merged(paths)
+        from .document import PageRef
+        from .shellint import combined_name
+
+        doc = PdfDocument()
+        for p in paths:
+            src = self._add_source(doc, p)
+            if src is not None:
+                doc.pages += [PageRef(src, i) for i in range(src.doc.page_count)]
+        if not doc.pages:
+            return None
+        n_files = len(doc.sources)
+        doc.path = combined_name(os.path.dirname(paths[0]))
+        doc.converted = True  # Save asks for a file name
+        self.canvas.set_document(doc)
+        self.canvas.undo.resetClean()  # unsaved until saved
+        self.settings.setValue("lastdir", os.path.dirname(paths[0]))
+        self._update_enabled()
+        self._update_title()
+        self._sync_view()
+        self._tool_changed(self.canvas.tool)
+        self.toast(f"Combined {n_files} files ({len(doc.pages)} pages). Save to keep it.", ms=4000)
+        return self
+
+    def _add_source(self, doc, path: str):
+        """Load `path` as a new source of `doc`, asking for a password if needed. None on failure (reported)."""
+        try:
+            return doc.add_source(path)
+        except PasswordRequired:
+            pw, ok = QInputDialog.getText(self, "Password", f"{os.path.basename(path)} is protected. Password:", QLineEdit.EchoMode.Password)
+            if not ok:
+                return None
+            try:
+                return doc.add_source(path, pw)
+            except Exception as ex:  # noqa: BLE001
+                QMessageBox.warning(self, APP, f"Couldn't open {os.path.basename(path)}: {ex}")
+        except Exception as ex:  # noqa: BLE001
+            QMessageBox.warning(self, APP, f"Couldn't open {os.path.basename(path)}: {ex}")
+        return None
+
     def _commit_edits(self) -> None:
         tool = getattr(self, "textedit_tool", None)  # Edit text: its focus-out commit is deferred, too late for a save
         if tool is not None and tool.editing():
@@ -770,6 +820,9 @@ class MainWindow(QMainWindow):
         return org if org is not None and org.isVisible() else self.sidebar
 
     def _target_rows(self) -> list[int]:
+        rows = getattr(self, "rows_override", None)  # a page's context menu on the canvas: that page
+        if rows:
+            return list(rows)
         view = self._page_view()
         rows = view.selected_rows() if view is not self.sidebar or view.hasFocus() or len(view.selectedItems()) > 1 else []
         return rows or ([self.canvas.current_index()] if self.canvas.order else [])
@@ -821,20 +874,7 @@ class MainWindow(QMainWindow):
 
     def _insert_source(self, path: str):
         """Load `path` as a new source of the document, asking for a password if needed. None on failure."""
-        doc = self.canvas.doc
-        try:
-            return doc.add_source(path)
-        except PasswordRequired:
-            pw, ok = QInputDialog.getText(self, "Password", f"{os.path.basename(path)} is protected. Password:", QLineEdit.EchoMode.Password)
-            if not ok:
-                return None
-            try:
-                return doc.add_source(path, pw)
-            except Exception as ex:  # noqa: BLE001
-                QMessageBox.warning(self, APP, f"Couldn't open {os.path.basename(path)}: {ex}")
-        except Exception as ex:  # noqa: BLE001
-            QMessageBox.warning(self, APP, f"Couldn't open {os.path.basename(path)}: {ex}")
-        return None
+        return self._add_source(self.canvas.doc, path)
 
     def insert_files(self, paths: list[str], row: int) -> None:
         doc = self.canvas.doc

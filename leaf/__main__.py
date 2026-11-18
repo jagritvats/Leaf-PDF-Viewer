@@ -1,4 +1,4 @@
-"""Entry point: `leaf [file.pdf ...]`."""
+"""Entry point: `leaf [file.pdf ...]`, `leaf --merge a.pdf b.pdf ...` (one new document made of the files)."""
 from __future__ import annotations
 
 import sys
@@ -57,11 +57,20 @@ def main() -> int:
         return mcp_main(sys.argv[2:])
     import os
 
+    files = [a for a in sys.argv[1:] if not a.startswith("-")]
+    merge = "--merge" in sys.argv
+    lock = None
     if "--new-instance" not in sys.argv and not os.environ.get("LEAF_NO_SINGLE_INSTANCE"):
-        from .ipc import forward_open
+        from .ipc import StartupLock, forward_open
 
+        # launches that start together (Explorer: one per selected file) queue here until the first one listens
+        lock = StartupLock()
+        if not lock.acquire():
+            lock = None
         # single instance: a running Leaf takes the files (and comes to the front); this process just exits
-        if forward_open([a for a in sys.argv[1:] if not a.startswith("-")], new_window="--new-window" in sys.argv):
+        if forward_open(files, new_window="--new-window" in sys.argv, merge=merge):
+            if lock is not None:
+                lock.release()
             return 0
 
     from PySide6.QtCore import QCoreApplication, Qt
@@ -86,9 +95,13 @@ def main() -> int:
     from . import ipc
 
     ipc.start_server()  # later launches hand their files to this process; agents connect here (leaf/agentlink.py)
-    files = [a for a in sys.argv[1:] if not a.startswith("-")]
-    for f in files:
-        win.open_path(f)
+    if lock is not None:
+        lock.release()
+    if merge:
+        ipc.queue_merge(files)  # files of launches that were waiting on the lock join the same document
+    else:
+        for f in files:
+            win.open_path(f)
     opener = _FileOpenFilter(win)  # macOS: Finder "Open With" / dropping on the Dock icon
     app.installEventFilter(opener)
     code = app.exec()

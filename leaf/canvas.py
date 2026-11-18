@@ -1378,6 +1378,15 @@ class Canvas(QGraphicsView):
                 self.undo.push(C.MoveItems(moves))
         self._move_snapshot = None
 
+    def contextMenuEvent(self, e) -> None:
+        """Items with their own menu (form fields) get it first; then `context_menu(event)` (features/menus.py)
+        shows the page's menu. Viewport event filters (an image under the cursor) run before both."""
+        super().contextMenuEvent(e)
+        handler = getattr(self, "context_menu", None)
+        if not e.isAccepted() and handler is not None and self.doc is not None and not self.presenting:
+            if handler(e):
+                e.accept()
+
     def mouseDoubleClickEvent(self, e) -> None:
         pos = e.position().toPoint()
         hit = self.itemAt(pos)

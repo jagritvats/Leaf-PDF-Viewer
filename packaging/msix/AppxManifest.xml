@@ -19,11 +19,12 @@
 <Package
   xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
   xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:uap2="http://schemas.microsoft.com/appx/manifest/uap/windows10/2"
   xmlns:uap3="http://schemas.microsoft.com/appx/manifest/uap/windows10/3"
   xmlns:uap10="http://schemas.microsoft.com/appx/manifest/uap/windows10/10"
   xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
-  IgnorableNamespaces="uap uap3 uap10 desktop rescap">
+  IgnorableNamespaces="uap uap2 uap3 uap10 desktop rescap">
 
   <Identity Name="{{IDENTITY_NAME}}" Publisher="{{PUBLISHER}}" Version="{{VERSION}}" ProcessorArchitecture="x64"/>
 
@@ -57,15 +58,21 @@
           ShortName="Leaf"/>
       </uap:VisualElements>
       <Extensions>
-        <!-- "Open with" for PDFs; the user picks the default app, the package never takes it over -->
-        <uap:Extension Category="windows.fileTypeAssociation">
-          <uap:FileTypeAssociation Name="pdf">
+        <!-- "Open with" and Default apps for PDFs (the user picks the default app, the package never takes it over),
+             plus Explorer verbs on .pdf files: "Edit with Leaf" and "Combine with Leaf" (one process per file; the
+             running Leaf gathers them, leaf/ipc.py) -->
+        <uap3:Extension Category="windows.fileTypeAssociation">
+          <uap3:FileTypeAssociation Name="pdf" Parameters="&quot;%1&quot;">
             <uap:DisplayName>PDF document</uap:DisplayName>
             <uap:SupportedFileTypes>
               <uap:FileType ContentType="application/pdf">.pdf</uap:FileType>
             </uap:SupportedFileTypes>
-          </uap:FileTypeAssociation>
-        </uap:Extension>
+            <uap2:SupportedVerbs>
+              <uap3:Verb Id="edit" Parameters="&quot;%1&quot;">Edit with Leaf</uap3:Verb>
+              <uap3:Verb Id="combine" Parameters="--merge &quot;%1&quot;">Combine with Leaf</uap3:Verb>
+            </uap2:SupportedVerbs>
+          </uap3:FileTypeAssociation>
+        </uap3:Extension>
       </Extensions>
     </Application>
     <!-- CLI-BEGIN: removed by build_msix.ps1 when the bundle has no leaf-cli.exe -->

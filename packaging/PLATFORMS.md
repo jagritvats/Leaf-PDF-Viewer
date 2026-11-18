@@ -74,8 +74,9 @@ terminal. Its self-test passed on this machine. Linux and macOS executables are 
 folder, when it exists at build time, is bundled as `_internal/docs`.
 
 Installer: `packaging/leaf.iss` (Inno Setup 6.3+), per-user install without admin rights, Start menu entry, optional
-desktop icon, "Open with" registration for .pdf (does not take over the default PDF app), uninstaller. Inno Setup is
-not installed on this machine, so the installer was not built locally; CI installs it with Chocolatey.
+desktop icon, PDF app registration (does not take over the default PDF app; see [OS integration](#os-integration)),
+optional "Combine with Leaf" Send to shortcut, uninstaller. CI installs Inno Setup with Chocolatey; the script
+compiles with ISCC 6 on this machine (checked 2026-11-18 against a dummy bundle, not installed).
 
 ```
 iscc /DVersion=0.1.0 packaging\leaf.iss                                             -> dist\Leaf-0.1.0-windows-x64-setup.exe
@@ -85,6 +86,27 @@ iscc /DVersion=0.1.0 /DSourceDir=..\dist\ocr\Leaf /DSuffix=-ocr packaging\leaf.i
 Signing: unsigned builds show a SmartScreen warning ("More info › Run anyway"). An OV/EV code-signing certificate
 (or Azure Trusted Signing) and `signtool sign /fd sha256 /tr <timestamp-url> /td sha256` on `Leaf.exe` and the
 setup exe remove it (EV/Trusted Signing immediately, OV after reputation builds up).
+
+## OS integration
+
+`leaf/shellint.py` (pure helpers + the system calls), `leaf/features/share.py`, `leaf/features/menus.py`.
+
+| | Windows (installer / zip) | Microsoft Store (MSIX) | Linux |
+|---|---|---|---|
+| PDF app registration | Leaf.pdf ProgID (FriendlyTypeName, icon, AppUserModelID), `Software\Leaf\Capabilities` + `RegisteredApplications` (Default apps, "How do you want to open this?"), .pdf OpenWithProgids. The zip: Settings › System › Make Leaf the default offers to write the same entries for the user (and to remove them) | `.pdf` file type association in the manifest | desktop entry `MimeType=application/pdf` (images are opened too but deliberately not declared: Leaf would become a candidate default image viewer) |
+| Make default | opens `ms-settings:defaultapps?registeredAppUser=Leaf` (Windows 11; `ms-settings:defaultapps` on 10) | `…?registeredAUMID=<PackageFamilyName>!Leaf` | `xdg-mime default <app-id>.desktop application/pdf` after confirmation, read back with `xdg-mime query`; Flatpak: explains (the sandbox has its own mimeapps.list); no installed desktop entry (AppImage): explains |
+| File manager | Explorer classic menu (Windows 11: Show more options): Edit with Leaf, Combine with Leaf (`SystemFileAssociations\.pdf\shell`, MultiSelectModel=Document: one process per file, gathered by the running Leaf; Explorer hides them above 15 files), Send to › Combine with Leaf (all files in one process) | `uap3:Verb` edit/combine in `uap2:SupportedVerbs` (makeappx accepts the manifest; verbs not yet seen on a signed install) | `packaging/linux/leaf-combine.desktop` (Dolphin service menu, the AUR package installs it), `nautilus-combine-with-leaf.sh` (GNOME Files script, copy by hand) |
+| Share | Share… = Explorer's own Share verb (`Windows.ModernShare`) invoked on the file through IContextMenu (no WinRT package bundled); Copy file (CF_HDROP via Qt + Preferred DropEffect copy); Email… (Simple MAPI `MAPISendMailW`, shown when `Software\Clients\Mail` names a client); Show in folder (`SHOpenFolderAndSelectItems`) | same | Copy file (uri-list + `x-special/gnome-copied-files`), Email… (`xdg-email --attach`, not in Flatpak), Show in folder (FileManager1 `ShowItems`, else the folder) |
+| Jump list | Tasks › New window (`ICustomDestinationList`, keeps the Recent category) | not set (package identity) | desktop action New Window |
+
+`leaf --merge a.pdf b.pdf …` opens the files as one new unsaved document (Save asks for a name). Launches that start
+together wait on a startup lock until the first Leaf listens, then forward their files; `--merge` requests are
+gathered for 0.8 s and sorted by name when each came alone (Explorer's per-file launches).
+
+Not done: Windows 11's compact top-level context menu (needs an IExplorerCommand COM shell extension, or a sparse
+package with `desktop4:FileExplorerContextMenus`); dragging a page thumbnail out to Explorer (Qt needs the file
+before the drag starts, so every internal reorder drag would export a temp PDF; it needs delayed rendering through
+a native IDataObject).
 
 ## Linux
 
@@ -188,13 +210,13 @@ the clean fix is `setDesktopFileName("<app-id>")` (needed for Flatpak, where the
 On Windows, the explicit AppUserModelID `Leaf.PdfEditor` is right for the zip/installer builds but must be skipped
 in the MSIX (Windows assigns `<PackageFamilyName>!Leaf`; check `GetCurrentPackageFullName` returns 0), otherwise
 the taskbar groups Leaf's windows apart from its Start entry. The desktop action "New Window" runs
-`leaf --new-window` (today the flag is ignored and a second instance opens, which is a new window anyway).
+`leaf --new-window` (the running Leaf opens an empty window).
 
 | Channel | Package | Status | You need to |
 |---|---|---|---|
 | Flathub | `packaging/flatpak/<app-id>.yml`: org.freedesktop.Platform 25.08 + the CI tarball (Qt bundled) | manifest written + YAML-checked; not built (no flatpak-builder here) | 1. set the app id; 2. choose the license (`<project_license>` in the metainfo is a TODO; Flathub requires it); 3. tag a release so the tarball URL exists, put its sha256 in the manifest; 4. push `marketing/out/screens/light/*-1920x1080.png` to `main` (the metainfo's screenshot URLs point at raw.githubusercontent.com); 5. test with `bash packaging/flatpak/build_local.sh` on a Linux desktop; 6. fork github.com/flathub/flathub, branch `new-pr`, add the manifest, open the PR and answer the review (expect questions about `--filesystem=home` and `--share=network`, both justified in the manifest, and possibly a request for a source build: the route is described at the top of the manifest) |
 | AUR | `leaf-pdf-bin` (binary tarball → `/opt/leaf-pdf-bin`, `/usr/bin/leaf` launcher, desktop entry, metainfo, icons) | `package()` dry-run OK in WSL; makepkg/namcap not available here | 1. AUR account with an SSH key; 2. maintainer line + license in the PKGBUILD; 3. on Arch: `updpkgsums && makepkg -si && namcap PKGBUILD *.pkg.tar.zst && makepkg --printsrcinfo > .SRCINFO`; 4. `git clone ssh://aur@aur.archlinux.org/leaf-pdf-bin.git`, add PKGBUILD + .SRCINFO, push. Bump `pkgver` and checksums for every release |
-| Microsoft Store | MSIX of `dist/Leaf` (Leaf.exe + leaf-cli.exe with a `leaf-cli` execution alias, .pdf "Open with", runFullTrust) | packed with makeappx 10.0.26100 on this machine (unsigned, 69 MB); CI packs it too | 1. Partner Center developer account (individual or company); 2. reserve the name "Leaf" (or another: "Leaf" may be taken); 3. copy *Product identity* (Package/Identity/Name, Publisher `CN=…`, Publisher display name) and build: `pwsh packaging\msix\build_msix.ps1 -IdentityName … -Publisher "CN=…" -PublisherDisplayName …`; 4. upload the unsigned .msix (the Store signs it); 5. justify `runFullTrust` (Win32 desktop app) in the submission; 6. listing assets below; 7. privacy policy URL (the Store asks because of the network use: OCR language downloads, timestamp server) |
+| Microsoft Store | MSIX of `dist/Leaf` (Leaf.exe + leaf-cli.exe with a `leaf-cli` execution alias, .pdf "Open with" with Edit/Combine verbs, runFullTrust) | packed with makeappx 10.0.26100 on this machine (unsigned, 69 MB); CI packs it too | 1. Partner Center developer account (individual or company); 2. reserve the name "Leaf" (or another: "Leaf" may be taken); 3. copy *Product identity* (Package/Identity/Name, Publisher `CN=…`, Publisher display name) and build: `pwsh packaging\msix\build_msix.ps1 -IdentityName … -Publisher "CN=…" -PublisherDisplayName …`; 4. upload the unsigned .msix (the Store signs it); 5. justify `runFullTrust` (Win32 desktop app) in the submission; 6. listing assets below; 7. privacy policy URL (the Store asks because of the network use: OCR language downloads, timestamp server) |
 | Sideloading the MSIX | same | — | a code-signing certificate whose subject equals `-Publisher`, then `-CertPath cert.pfx -CertPassword …` (signtool). For a local test: `New-SelfSignedCertificate -Type CodeSigningCert -Subject "CN=Leaf Dev" -CertStoreLocation Cert:\CurrentUser\My`, export it as .pfx, trust it in *Local Machine › Trusted People* (admin), then `Add-AppxPackage` |
 
 Microsoft Store listing assets (uploaded in Partner Center, not inside the package): screenshots

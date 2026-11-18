@@ -229,6 +229,7 @@ def test_msix_manifest():
     ns = {
         "m": "http://schemas.microsoft.com/appx/manifest/foundation/windows10",
         "uap": "http://schemas.microsoft.com/appx/manifest/uap/windows10",
+        "uap3": "http://schemas.microsoft.com/appx/manifest/uap/windows10/3",
         "rescap": "http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities",
     }
     root = ET.parse(os.path.join(PKG, "msix", "AppxManifest.xml")).getroot()
@@ -239,7 +240,7 @@ def test_msix_manifest():
     gui = apps[0]
     assert gui.get("Executable") == "Leaf.exe" and gui.get("EntryPoint") == "Windows.FullTrustApplication"
     assert any(a.get("Executable") == "leaf-cli.exe" for a in apps)
-    ft = gui.find(".//uap:FileTypeAssociation/uap:SupportedFileTypes/uap:FileType", ns)
+    ft = gui.find(".//uap3:FileTypeAssociation/uap:SupportedFileTypes/uap:FileType", ns)  # uap3: verbs (test_shellint)
     assert ft.text == ".pdf"
     assert root.find("m:Capabilities/rescap:Capability", ns).get("Name") == "runFullTrust"
     ve = gui.find("uap:VisualElements", ns)

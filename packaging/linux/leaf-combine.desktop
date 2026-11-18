@@ -1,0 +1,13 @@
+# KDE Dolphin service menu: right-click PDFs > Combine with Leaf (opens them as one new document).
+# Installed by the AUR package to /usr/share/kio/servicemenus/; by hand: copy to ~/.local/share/kio/servicemenus/
+# and make it executable (chmod +x: Plasma 6 only runs trusted service menus from the home folder).
+[Desktop Entry]
+Type=Service
+MimeType=application/pdf;
+Actions=combine;
+X-KDE-Priority=TopLevel
+
+[Desktop Action combine]
+Name=Combine with Leaf
+Icon=io.github.jagritvats.Leaf
+Exec=leaf --merge %F
