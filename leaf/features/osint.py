@@ -1,5 +1,6 @@
-"""OS integration (leaf/osint.py): recent documents, title bar colour, pen input, and a System settings page.
-Taskbar progress / keep-awake are called from the long-running tasks themselves (osint.progress)."""
+"""OS integration (leaf/osint.py): recent documents, title bar colour, pen input, the jump list's "New window"
+task (leaf/shellint.py), and a System settings page. Taskbar progress / keep-awake are called from the long-running
+tasks themselves (osint.progress)."""
 from __future__ import annotations
 
 import os
@@ -7,6 +8,7 @@ import os
 from .. import osint
 
 _page_registered = False
+_jump_list_done = False
 
 
 def install(win) -> None:
@@ -23,6 +25,24 @@ def install(win) -> None:
     wid = id(win)
     win.destroyed.connect(lambda *_: osint.forget_window(wid))
     _register_settings_page()
+    _jump_list()
+
+
+def _jump_list() -> None:
+    """Once per process, a moment after start: the taskbar jump list gets a "New window" task (installed and
+    portable Windows builds; not the MSIX, whose package identity launches differently, nor source runs)."""
+    global _jump_list_done
+    from .. import shellint
+
+    if _jump_list_done or not shellint.IS_WIN or not osint._native():
+        return
+    _jump_list_done = True
+    exe = shellint.frozen_exe()
+    if exe is None or shellint.in_msix():
+        return
+    from PySide6.QtCore import QTimer
+
+    QTimer.singleShot(2000, lambda: shellint.set_jump_list(shellint.jump_list_tasks(exe)))
 
 
 def _register_settings_page() -> None:

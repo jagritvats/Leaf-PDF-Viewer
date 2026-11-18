@@ -731,3 +731,120 @@ def _find_verb(cm, hmenu, verb: str, first: int) -> int | None:
         if hr == 0 and buf.value.lower() == verb.lower():  # GCS_VERBW
             return cid
     return None
+
+
+# ------------------------------------------------------------------------------------------- jump list
+def jump_list_tasks(exe: str) -> list[dict]:
+    """The Tasks of Leaf's taskbar / Start jump list."""
+    return [{"title": "New window", "exe": exe, "args": "--new-window", "icon": exe, "tip": "Open another Leaf window"}]
+
+
+def set_jump_list(tasks: list[dict], app_id: str | None = AUMID) -> bool:
+    """Windows: replace the Tasks of the jump list (ICustomDestinationList). `app_id` None = the process's own
+    identity (the MSIX package's). The "Recent" category stays Windows' own (files opened through Leaf.pdf)."""
+    if not IS_WIN:
+        return False
+    try:
+        return _set_jump_list(tasks, app_id)
+    except Exception:  # noqa: BLE001 - cosmetic only
+        return False
+
+
+def delete_jump_list(app_id: str) -> bool:
+    if not IS_WIN:
+        return False
+    try:
+        dl = _co_create("77f10cf0-3db5-4966-b520-b7c54fd35ed6", "6332debf-87b5-4670-90c0-5e57b408a49e")
+        if dl is None:
+            return False
+        try:
+            import ctypes
+
+            return _vcall(dl, 10, (app_id,), (ctypes.c_wchar_p,)) == 0  # DeleteList
+        finally:
+            _vcall(dl, 2, (), ())
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def _co_create(clsid: str, iid: str):
+    import ctypes
+
+    ole32 = ctypes.windll.ole32
+    ole32.CoInitializeEx(None, 0x2)
+    ptr = ctypes.c_void_p()
+    hr = ole32.CoCreateInstance(ctypes.byref(_guid(clsid)), None, 1, ctypes.byref(_guid(iid)), ctypes.byref(ptr))
+    return ptr if hr == 0 and ptr.value else None
+
+
+def _set_jump_list(tasks: list[dict], app_id: str | None) -> bool:
+    import ctypes
+    from ctypes import POINTER, byref, c_uint, c_void_p, c_wchar_p
+
+    dl = _co_create("77f10cf0-3db5-4966-b520-b7c54fd35ed6", "6332debf-87b5-4670-90c0-5e57b408a49e")  # DestinationList
+    if dl is None:
+        return False
+    coll = _co_create("2d3468c1-36a7-43b6-ac24-d3f02fd9607a", "5632b1a4-e38a-400a-928a-d4cd63230295")  # IObjectCollection
+    links = []
+    try:
+        if coll is None:
+            return False
+        if app_id and _vcall(dl, 3, (app_id,), (c_wchar_p,)) != 0:  # SetAppID
+            return False
+        slots, removed = c_uint(0), c_void_p()
+        if _vcall(dl, 4, (byref(slots), byref(_guid("92CA9DCD-5622-4bba-A805-5E9F541BD8C9")), byref(removed)),
+                  (POINTER(c_uint), c_void_p, POINTER(c_void_p))) != 0:  # BeginList
+            return False
+        if removed.value:
+            _vcall(removed, 2, (), ())
+        # a custom list hides Windows' automatic "Recent" unless it is asked for (fails harmlessly when Leaf isn't
+        # registered for a file type: a portable run has no Recent category anyway)
+        _vcall(dl, 6, (2,), (ctypes.c_int,))  # AppendKnownCategory(KDC_RECENT)
+        for t in tasks:
+            link = _co_create("00021401-0000-0000-C000-000000000046", "000214F9-0000-0000-C000-000000000046")
+            if link is None:
+                return False
+            links.append(link)
+            _vcall(link, 20, (t["exe"],), (c_wchar_p,))  # SetPath
+            _vcall(link, 11, (t.get("args", ""),), (c_wchar_p,))  # SetArguments
+            _vcall(link, 7, (t.get("tip", t["title"]),), (c_wchar_p,))  # SetDescription
+            _vcall(link, 17, (t.get("icon", t["exe"]), 0), (c_wchar_p, ctypes.c_int))  # SetIconLocation
+            if not _set_title(link, t["title"]):
+                return False
+            if _vcall(coll, 5, (link,), (c_void_p,)) != 0:  # AddObject
+                return False
+        if _vcall(dl, 7, (coll,), (c_void_p,)) != 0:  # AddUserTasks (an IObjectCollection is an IObjectArray)
+            _vcall(dl, 11, (), ())  # AbortList
+            return False
+        return _vcall(dl, 8, (), ()) == 0  # CommitList
+    finally:
+        for p in links + [coll, dl]:
+            if p is not None and p.value:
+                _vcall(p, 2, (), ())
+
+
+def _set_title(link, title: str) -> bool:
+    """PKEY_Title on the shell link: the text the jump list shows."""
+    import ctypes
+    from ctypes import POINTER, byref, c_void_p
+
+    class PropKey(ctypes.Structure):
+        _fields_ = [("fmtid", ctypes.c_byte * 16), ("pid", ctypes.c_uint32)]
+
+    class PropVariant(ctypes.Structure):
+        _fields_ = [("vt", ctypes.c_ushort), ("r1", ctypes.c_ushort), ("r2", ctypes.c_ushort), ("r3", ctypes.c_ushort),
+                    ("val", c_void_p), ("pad", c_void_p)]
+
+    store = c_void_p()
+    if _vcall(link, 0, (byref(_guid("886d8eeb-8cf2-4446-8d02-cdba1dbdcf99")), byref(store)),
+              (c_void_p, POINTER(c_void_p))) != 0:  # QueryInterface(IPropertyStore)
+        return False
+    try:
+        key = PropKey(_guid("F29F85E0-4FF9-1068-AB91-08002B27B3D9"), 2)
+        text = ctypes.create_unicode_buffer(title)
+        pv = PropVariant(31, 0, 0, 0, ctypes.cast(text, c_void_p), None)  # VT_LPWSTR (borrowed; the store copies)
+        if _vcall(store, 6, (byref(key), byref(pv)), (c_void_p, c_void_p)) != 0:  # SetValue
+            return False
+        return _vcall(store, 7, (), ()) == 0  # Commit
+    finally:
+        _vcall(store, 2, (), ())

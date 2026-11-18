@@ -362,3 +362,21 @@ def test_linux_file_manager_actions():
 
 
 from tests.test_editor import app  # noqa: E402,F401 - QApplication fixture (file_mime)
+
+
+# ============================================================== jump list
+def test_jump_list_tasks():
+    (t,) = S.jump_list_tasks(EXE)
+    assert t["title"] == "New window" and t["exe"] == EXE and t["args"] == "--new-window"
+
+
+@pytest.mark.skipif(not S.IS_WIN, reason="Windows shell")
+def test_jump_list_commit_on_a_throwaway_app_id():
+    import sys
+    import uuid
+
+    aid = "Leaf.Test." + uuid.uuid4().hex[:10]  # not Leaf's own id: the user's jump list is left alone
+    try:
+        assert S.set_jump_list(S.jump_list_tasks(sys.executable), aid)
+    finally:
+        assert S.delete_jump_list(aid)
