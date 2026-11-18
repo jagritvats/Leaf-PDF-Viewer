@@ -61,7 +61,7 @@ modules:
     sources:
       - type: archive
         url: https://github.com/jagritvats/Leaf-PDF-Viewer/releases/download/v0.2.1/leaf-0.2.1-linux-x86_64.tar.gz
-        sha256: "c6415ecce6c842a5988729d021420de1b1186b0e350774fefb0ee3ea55ec8b45"
+        sha256: "90ee32f0e3bff6185f5ca0be2ce3d90fb85bddf063645ac401f90c799c651436"
         only-arches:
           - x86_64
         x-checker-data:
