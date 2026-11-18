@@ -7,8 +7,8 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 import pytest
 from PySide6.QtCore import QEvent, QPoint, QPointF, Qt
-from PySide6.QtGui import QColor, QKeyEvent
-from PySide6.QtWidgets import QApplication
+from PySide6.QtGui import QColor, QKeyEvent, QUndoCommand
+from PySide6.QtWidgets import QApplication, QMessageBox
 
 from tests.e2e_kit import (  # noqa: F401
     CTRL, SHIFT, activate, click, driver, key, open_in, pump, sandbox, shortcut, wait_until, windows,
@@ -238,6 +238,34 @@ def test_focus_mode_with_full_screen_and_presenting(app, windows, doc, steps):  
             assert not any(_chrome(win)[k] for k in ("menu", "toolbar", "status")), (steps, _chrome(win))
     assert not win.focus_mode.on and not win.canvas.presenting and not win.isFullScreen()
     assert _chrome(win) == before
+
+
+@pytest.mark.parametrize("focus", [False, True])
+def test_closing_in_full_screen_saves_the_normal_toolbars(app, windows, doc, driver, focus):  # noqa: F811
+    """The toolbar layout saved on close is the normal one: closing in full screen (or Focus mode in full screen)
+    started the next window without its toolbar. A cancelled close stays in full screen."""
+    win = windows()
+    open_in(win, doc)
+    if focus:
+        win.a_focus_mode.trigger()
+        pump(0.05)
+    win.viewing.a_fullscreen.trigger()
+    pump(0.05)
+    win.canvas.undo.push(QUndoCommand("change"))  # unsaved: the first close asks, and is cancelled
+    driver.on("msg", lambda _m: QMessageBox.StandardButton.Cancel)
+    win.close()
+    pump(0.1)
+    assert win.isVisible() and win.viewing._screen_state is not None
+    assert not win.toolbar.isVisible() and not win.menuBar().isVisible()
+    win.canvas.undo.setClean()
+    win.close()
+    pump(0.1)
+    win2 = windows()
+    open_in(win2, doc)
+    if win2.focus_mode.on:
+        win2.a_focus_mode.trigger()
+        pump(0.05)
+    assert win2.toolbar.isVisible() and win2.menuBar().isVisible()
 
 
 # ------------------------------------------------------------------ start screen

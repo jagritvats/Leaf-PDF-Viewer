@@ -259,7 +259,18 @@ class Viewing:
     def _closing(self) -> None:
         if self._present_state is not None:
             self.exit_presentation()
+        if self._screen_state is not None:  # the toolbar layout saved on close is the normal one, not full screen's
+            vis = self._screen_state[1]
+            self._unhide(vis)
+            QTimer.singleShot(0, lambda: self._close_cancelled(vis))
         self.save_position()
+
+    def _close_cancelled(self, vis: dict) -> None:
+        try:
+            if self.win.isVisible() and self._screen_state is not None and self._screen_state[1] is vis:
+                self._hide(list(vis))
+        except RuntimeError:  # the window is gone
+            pass
 
     def message(self, text: str) -> None:
         toast = getattr(self.win, "toast", None)
