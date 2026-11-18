@@ -646,6 +646,7 @@ class Canvas(QGraphicsView):
         self._link_press = None
         self._flip_at = 0.0
         self.confirm_external = self._confirm_external
+        self.refuse_external = self._refuse_external
         self.verticalScrollBar().valueChanged.connect(self._scrolled)
         sc.selectionChanged.connect(self.selectionInfo)
 
@@ -1022,27 +1023,41 @@ class Canvas(QGraphicsView):
             pt = QPointF(to.x, to.y) if to is not None and (to.x or to.y) else None
             self.go_to_point(i, pt)
             return
-        if kind == pymupdf.LINK_URI:
-            uri = (ln.get("uri") or "").strip()
-            if not uri or uri.lower().startswith("javascript:"):
-                return
-            if self.confirm_external(uri):
-                QDesktopServices.openUrl(QUrl(uri))
+        if kind not in (pymupdf.LINK_URI, pymupdf.LINK_GOTOR, pymupdf.LINK_LAUNCH):
             return
-        if kind in (pymupdf.LINK_GOTOR, pymupdf.LINK_LAUNCH):
-            f = ln.get("file") or ""
-            if not f:
-                return
-            if not os.path.isabs(f) and self.doc.path:
-                f = os.path.join(os.path.dirname(self.doc.path), f)
-            if self.confirm_external(f):
-                QDesktopServices.openUrl(QUrl.fromLocalFile(f))
+        from . import safeopen
 
-    def _confirm_external(self, target: str) -> bool:
-        r = QMessageBox.question(self, "Open link", f"Open this link outside Leaf?\n\n{target}",
-                                 QMessageBox.StandardButton.Open | QMessageBox.StandardButton.Cancel,
-                                 QMessageBox.StandardButton.Open)
+        base = os.path.dirname(self.doc.path) if self.doc is not None and self.doc.path else None
+        if kind == pymupdf.LINK_URI:
+            if not (ln.get("uri") or "").strip():
+                return
+            v = safeopen.check_uri(ln.get("uri"), base)
+        else:
+            if not ln.get("file"):
+                return
+            v = safeopen.check_file(ln.get("file"), base)
+        if v.action == "block":
+            self.refuse_external(v.message)
+            return
+        if not (self.confirm_external(v.target) if v.action == "open" else self.confirm_external(v.target, v.message)):
+            return
+        QDesktopServices.openUrl(QUrl.fromLocalFile(v.target) if v.local else QUrl(v.target))
+
+    def _confirm_external(self, target: str, warning: str = "") -> bool:
+        from .safeopen import shown
+
+        if warning:
+            r = QMessageBox.warning(self, "Open link", f"{warning}\n\n{shown(target)}",
+                                    QMessageBox.StandardButton.Open | QMessageBox.StandardButton.Cancel,
+                                    QMessageBox.StandardButton.Cancel)
+        else:
+            r = QMessageBox.question(self, "Open link", f"Open this link outside Leaf?\n\n{shown(target)}",
+                                     QMessageBox.StandardButton.Open | QMessageBox.StandardButton.Cancel,
+                                     QMessageBox.StandardButton.Open)
         return r == QMessageBox.StandardButton.Open
+
+    def _refuse_external(self, message: str) -> None:
+        QMessageBox.warning(self, "Link not opened", message)
 
     def _hover_link(self, e) -> None:
         sp = self.mapToScene(e.position().toPoint())
