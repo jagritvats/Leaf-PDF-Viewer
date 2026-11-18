@@ -3,11 +3,11 @@
 
 Imported statically (not by name) so packagers like PyInstaller see and bundle every module."""
 
-from . import agentlink, annotations, compare, decorate, editset, forms, history, images, ocr, optimize, osint, output, pages, redact, replace, settings, signing, structure, textfmt, viewing
+from . import agentlink, annotations, compare, decorate, editset, focus, forms, history, images, ocr, optimize, osint, output, pages, redact, replace, settings, signing, structure, textfmt, viewing
 from . import textedit_ui
 
 # history last: it applies saved shortcut overrides to every action the others created
-MODULES = [viewing, forms, pages, textfmt, annotations, output, decorate, redact, signing, ocr, optimize, textedit_ui, images, structure, replace, editset, agentlink, osint, settings, compare, history]
+MODULES = [viewing, forms, pages, textfmt, annotations, output, decorate, redact, signing, ocr, optimize, textedit_ui, images, structure, replace, editset, agentlink, osint, settings, compare, focus, history]
 NAMES = [m.__name__.rsplit(".", 1)[1] for m in MODULES]
 
 

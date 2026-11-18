@@ -315,7 +315,8 @@ class MainWindow(QMainWindow):
             for d in self._parked_docks:
                 d.show()
             self._parked_docks = []
-        self.statusBar().setVisible(on)
+        focus = getattr(self, "focus_mode", None)  # Focus mode (features/focus.py) keeps the status bar hidden
+        self.statusBar().setVisible(on and not (focus is not None and focus.on))
 
     def _adopt_page_info(self) -> None:
         """A feature may add its own page-size label; show that one in place of ours."""

@@ -580,6 +580,7 @@ class Canvas(QGraphicsView):
     historyChanged = Signal()
     message = Signal(str)
     presentationExitRequested = Signal()
+    presentingChanged = Signal(bool)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -1569,6 +1570,7 @@ class Canvas(QGraphicsView):
             self.go_to(max(0, i), record=False)
             self.set_tool(tool)
         self.viewport().update()
+        self.presentingChanged.emit(on)
 
     def keyReleaseEvent(self, e) -> None:
         if e.key() == Qt.Key.Key_Space and not e.isAutoRepeat() and self._space:
