@@ -268,6 +268,25 @@ def test_closing_in_full_screen_saves_the_normal_toolbars(app, windows, doc, dri
     assert win2.toolbar.isVisible() and win2.menuBar().isVisible()
 
 
+def test_shortcut_editors_fit_their_rows(app, windows):  # noqa: F811
+    """The style's line edits are taller than a text row: the shortcuts list squeezed every editor to a sliver, so
+    no shortcut could be read."""
+    from PySide6.QtWidgets import QKeySequenceEdit
+
+    from leaf.shortcuts import ShortcutsDialog
+
+    win = windows()
+    dlg = ShortcutsDialog(win)
+    dlg.show()
+    pump(0.1)
+    eds = [e for e in dlg.findChildren(QKeySequenceEdit) if e.isVisible()]
+    assert eds
+    for e in eds[:5]:
+        line = e.findChild(type(dlg.search))
+        assert e.height() >= line.sizeHint().height() - 1, (e.height(), line.sizeHint().height())
+    dlg.close()
+
+
 # ------------------------------------------------------------------ start screen
 def test_start_screen_recent_open_and_clear(app, windows, tmp_path):  # noqa: F811
     paths = []
