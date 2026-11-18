@@ -1,0 +1,203 @@
+name: build
+
+# Tests + packaged builds for Windows, macOS and Linux. Every build runs `--self-test` on the frozen app
+# (render worker, edit/save, digital signature, optimize worker; OCR in the OCR variant).
+# Standard builds run on every push/PR. The OCR variant (RapidOCR + ONNX Runtime bundled, separate artifact) is
+# built for tags and for manual runs with "Also build the OCR variant" ticked.
+# Push a tag like v0.1.0 to publish the artifacts as a draft GitHub release.
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      ocr:
+        description: "Also build the OCR variant (RapidOCR bundled, larger download)"
+        type: boolean
+        default: true
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  # Store / distro metadata, checked offline: AppStream (appstreamcli), desktop entry (desktop-file-validate),
+  # Flatpak manifest (YAML), AUR PKGBUILD (bash syntax). See packaging/PLATFORMS.md, Stores and distributions.
+  metadata:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends appstream desktop-file-utils python3-yaml
+      - name: AppStream metainfo + desktop entry
+        run: bash packaging/linux/validate.sh
+      - name: Flatpak manifest, PKGBUILD, MSIX manifest
+        run: |
+          python3 -c 'import sys, yaml; [yaml.safe_load(open(f)) for f in sys.argv[1:]]; print("YAML OK")' packaging/flatpak/*.yml .github/workflows/*.yml
+          bash -n packaging/aur/PKGBUILD && echo "PKGBUILD syntax OK"
+          python3 -c 'import xml.dom.minidom as m; m.parse("packaging/msix/AppxManifest.xml"); print("AppxManifest OK")'
+
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            name: windows-x64
+          - os: macos-14          # Apple Silicon; Qt 6.12 needs macOS 14+
+            name: macos-arm64
+          - os: ubuntu-22.04      # oldest glibc we target (2.35; PySide6 6.12 needs 2.34): runs on current distros too
+            name: linux-x86_64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    env:
+      QT_QPA_PLATFORM: offscreen
+      BUILD_OCR: ${{ startsWith(github.ref, 'refs/tags/v') || inputs.ocr == true }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Qt runtime libraries (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libopengl0 libegl1 libgl1 libxkbcommon0 libxkbcommon-x11-0 \
+            libfontconfig1 libdbus-1-3 libxcb-cursor0 libglib2.0-0
+
+      # all extras: the OCR tests run too (they skip themselves when rapidocr/onnxruntime are missing). The standard
+      # build excludes the OCR packages in packaging/leaf.spec, so one environment serves both variants.
+      - name: Install
+        run: uv sync --group build --all-extras --frozen
+
+      - name: Test
+        run: uv run --no-sync pytest -q
+
+      - name: Version
+        id: v
+        shell: bash
+        run: echo "version=$(python3 -c 'import tomllib;print(tomllib.load(open("pyproject.toml","rb"))["project"]["version"])')" >> "$GITHUB_OUTPUT"
+
+      - name: Icons
+        shell: bash
+        run: |
+          uv run --no-sync python packaging/make_icons.py
+          if [ "$RUNNER_OS" = "macOS" ]; then iconutil -c icns build/icons/leaf.iconset -o build/icons/leaf.icns; fi
+
+      # ---------------------------------------------------------------- Windows
+      - name: Package + self-test (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          build() {  # $1 = dist folder
+            uv run --no-sync pyinstaller --noconfirm --log-level WARN --distpath "$1" --workpath "build/w-$(basename "$1")" packaging/leaf.spec
+            code=0; LEAF_SELFTEST_LOG="$PWD/$1/selftest.log" "./$1/Leaf/Leaf.exe" --self-test || code=$?
+            cat "$1/selftest.log"; du -sh "$1/Leaf"; return $code
+          }
+          build dist
+          # console twin of Leaf.exe for the command line (same bundle): its output reaches the terminal
+          ./dist/Leaf/leaf-cli.exe --self-test
+          if [ "$BUILD_OCR" = "true" ]; then LEAF_BUNDLE_OCR=1 build dist/ocr; fi
+
+      - name: Windows zip + installer
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $v = "${{ steps.v.outputs.version }}"
+          Compress-Archive -Path dist\Leaf -DestinationPath "dist\Leaf-$v-windows-x64.zip"
+          choco install innosetup --no-progress -y
+          $iscc = (Get-ChildItem "${env:ProgramFiles(x86)}\Inno Setup *\iscc.exe", "$env:ProgramFiles\Inno Setup *\iscc.exe" -ErrorAction SilentlyContinue | Select-Object -First 1).FullName
+          & $iscc /Q "/DVersion=$v" packaging\leaf.iss
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          if ($env:BUILD_OCR -eq "true") {
+            Compress-Archive -Path dist\ocr\Leaf -DestinationPath "dist\Leaf-$v-windows-x64-ocr.zip"
+            & $iscc /Q "/DVersion=$v" "/DSourceDir=..\dist\ocr\Leaf" "/DSuffix=-ocr" packaging\leaf.iss
+            if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          }
+
+      # unsigned MSIX with placeholder identity (Store upload: rebuild with the Partner Center identity, see
+      # packaging/PLATFORMS.md). Needs makeappx from the Windows SDK, present on the hosted Windows images.
+      - name: MSIX (Windows, unsigned)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $sdk = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\makeappx.exe" -ErrorAction SilentlyContinue
+          if (-not $sdk -and -not (Get-Command makeappx.exe -ErrorAction SilentlyContinue)) {
+            Write-Host "::warning::makeappx.exe not found on this runner: no MSIX built"; exit 0
+          }
+          ./packaging/msix/build_msix.ps1
+          if ($env:BUILD_OCR -eq "true") { ./packaging/msix/build_msix.ps1 -SourceDir dist\ocr\Leaf -Suffix -ocr }
+
+      # ------------------------------------------------------------------ macOS
+      - name: Package + self-test + disk image (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          v="${{ steps.v.outputs.version }}"
+          build() {  # $1 = dist folder, $2 = file suffix
+            uv run --no-sync pyinstaller --noconfirm --log-level WARN --distpath "$1" --workpath "build/m-$(basename "$1")" packaging/leaf.spec
+            codesign --force --deep -s - "$1/Leaf.app"   # ad-hoc signature (Gatekeeper still warns: not notarized)
+            codesign --verify --deep --strict "$1/Leaf.app" || echo "::warning::codesign --verify --strict failed for $1/Leaf.app"
+            "$1/Leaf.app/Contents/MacOS/Leaf" --self-test
+            du -sh "$1/Leaf.app"
+            rm -rf dmg && mkdir dmg && cp -R "$1/Leaf.app" dmg/ && ln -s /Applications dmg/Applications
+            for i in 1 2 3; do  # hdiutil sometimes fails with "Resource busy" on hosted runners
+              hdiutil create -volname Leaf -srcfolder dmg -ov -format UDZO "dist/Leaf-$v-macos-arm64$2.dmg" && break
+              sleep 5
+            done
+            test -f "dist/Leaf-$v-macos-arm64$2.dmg"
+          }
+          build dist ""
+          if [ "$BUILD_OCR" = "true" ]; then LEAF_BUNDLE_OCR=1 build dist/ocr -ocr; fi
+
+      # ------------------------------------------------------------------ Linux
+      - name: Linux tarball + AppImage
+        if: runner.os == 'Linux'
+        run: |
+          curl -fsSL -o appimagetool https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x appimagetool
+          export UV_PROJECT_ENVIRONMENT=.venv APPIMAGETOOL=$PWD/appimagetool
+          bash packaging/build_linux.sh && cat dist/selftest.log
+          if [ "$BUILD_OCR" = "true" ]; then LEAF_BUNDLE_OCR=1 bash packaging/build_linux.sh && cat dist/ocr/selftest.log; fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: leaf-${{ matrix.name }}
+          path: |
+            dist/*.zip
+            dist/*.exe
+            dist/*.msix
+            dist/*.dmg
+            dist/*.tar.gz
+            dist/*.AppImage
+            !dist/*-ocr*
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v4
+        if: env.BUILD_OCR == 'true'
+        with:
+          name: leaf-${{ matrix.name }}-ocr
+          path: dist/*-ocr*
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [metadata, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+          draft: true

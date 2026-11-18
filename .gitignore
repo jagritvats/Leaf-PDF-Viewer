@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.leaf-*.pdf
+build/
+dist/
+.venv-linux/
+*.spec.bak
+.ruff_cache/
+.mypy_cache/
+# generated: marketing renders and the demo documents they are shot from (scripts are kept)
+marketing/out/
+marketing/shots/work/

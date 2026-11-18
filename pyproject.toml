@@ -1,0 +1,37 @@
+[project]
+name = "leaf"
+version = "0.1.0"
+description = "Fast, local PDF editor"
+requires-python = ">=3.11"
+dependencies = [
+    "PySide6-Essentials>=6.8",
+    "PyMuPDF>=1.25",
+    "pyhanko>=0.25",
+]
+
+[project.scripts]
+leaf = "leaf.__main__:main"
+leaf-cli = "leaf.cli:main"
+
+[project.gui-scripts]
+leaf-gui = "leaf.__main__:main"
+
+[project.optional-dependencies]
+ocr = [
+    "onnxruntime>=1.18",
+    "rapidocr>=2",
+]
+
+[dependency-groups]
+build = [
+    "pyinstaller>=6.10",
+]
+dev = ["pytest>=8"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project.urls]
+Homepage = "https://github.com/jagritvats/Leaf-PDF-Viewer"
+Issues = "https://github.com/jagritvats/Leaf-PDF-Viewer/issues"

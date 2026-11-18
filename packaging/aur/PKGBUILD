@@ -1,0 +1,67 @@
+# Maintainer: TODO Your Name <you at example dot com>
+#
+# AUR package for Leaf from the prebuilt Linux release tarball (the CI build from packaging/build_linux.sh:
+# PyInstaller bundle with its own Python, Qt 6, PyMuPDF and pyHanko). AUR rules name prebuilt packages "-bin";
+# provides/conflicts let a later from-source "leaf-pdf" replace it. The plain name "leaf" is taken by other
+# software, hence "leaf-pdf".
+#
+# Before publishing: python packaging/set_app_id.py GITHUB_OWNER (app id + URLs), set the license, then
+#   updpkgsums && makepkg --printsrcinfo > .SRCINFO && namcap PKGBUILD && makepkg -si
+# and push PKGBUILD + .SRCINFO to ssh://aur@aur.archlinux.org/leaf-pdf-bin.git
+pkgname=leaf-pdf-bin
+_appid=io.github.jagritvats.Leaf
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Fast, local PDF editor: edit text, redact, fill and sign forms, digital signatures, OCR"
+arch=('x86_64')
+url="https://github.com/jagritvats/Leaf-PDF-Viewer"
+# TODO: Leaf's license is not chosen yet. It bundles MuPDF (AGPL-3.0), so likely 'AGPL-3.0-or-later';
+# then also install the license text (see package()).
+license=('LicenseRef-TODO')
+# Qt's platform plugins inside the bundle link these system libraries (Wayland and X11/xcb)
+depends=(
+  'glibc'
+  'libglvnd'
+  'libxkbcommon'
+  'libxkbcommon-x11'
+  'fontconfig'
+  'freetype2'
+  'dbus'
+  'wayland'
+  'libx11'
+  'libxcb'
+  'xcb-util-cursor'
+  'xcb-util-image'
+  'xcb-util-keysyms'
+  'xcb-util-renderutil'
+  'xcb-util-wm'
+  'hicolor-icon-theme'
+)
+optdepends=(
+  'xdg-desktop-portal: native file dialogs'
+  'cups: printing'
+)
+provides=('leaf-pdf')
+conflicts=('leaf-pdf')
+# PyInstaller executables carry their archive at the end of the file: stripping would destroy it
+options=('!strip' '!debug')
+source_x86_64=("leaf-$pkgver-linux-x86_64.tar.gz::$url/releases/download/v$pkgver/leaf-$pkgver-linux-x86_64.tar.gz")
+sha256sums_x86_64=('SKIP')  # TODO: updpkgsums (a real checksum is required for the AUR)
+
+package() {
+  cd "leaf-$pkgver-linux-x86_64"
+  install -d "$pkgdir/opt/$pkgname"
+  cp -a leaf/. "$pkgdir/opt/$pkgname/"
+  # launcher script (not a symlink): the bundle runs from its own folder
+  install -Dm755 /dev/stdin "$pkgdir/usr/bin/leaf" <<SH
+#!/bin/sh
+exec /opt/$pkgname/leaf "\$@"
+SH
+  install -Dm644 "$_appid.desktop" "$pkgdir/usr/share/applications/$_appid.desktop"
+  install -Dm644 "$_appid.metainfo.xml" "$pkgdir/usr/share/metainfo/$_appid.metainfo.xml"
+  for size in 64 128 256 512; do
+    install -Dm644 "icons/hicolor/${size}x${size}/apps/$_appid.png" \
+      "$pkgdir/usr/share/icons/hicolor/${size}x${size}/apps/$_appid.png"
+  done
+  # TODO once licensed: install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

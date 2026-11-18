@@ -1,0 +1,86 @@
+# Flatpak manifest for Leaf (Flathub-ready once the placeholders below are filled in).
+#
+# What it packages: the Linux release tarball that CI builds (packaging/build_linux.sh on Ubuntu 22.04:
+# PyInstaller bundle with its own Python, Qt 6, PyMuPDF/MuPDF, pyHanko and the Tesseract English data
+# leaf/data/tessdata/eng.traineddata). The runtime only has to supply glibc, Mesa/libglvnd, Wayland/X11 client
+# libraries, fontconfig and dbus, which org.freedesktop.Platform has.
+#
+# Why the binary tarball and not a source build:
+#   + one artifact for every Linux channel (tarball, AppImage, Flatpak, AUR), already self-tested in CI
+#     (--self-test: render worker, edit/save, digital signature, optimize and OCR workers)
+#   + builds in seconds, no network access at build time beyond the one download
+#   - Qt is bundled instead of shared with org.kde.Platform (~90 MB more on disk, the app does not pick up the
+#     runtime's Qt security updates; release a new tarball for Qt fixes)
+#   - Flathub accepts upstream-built binaries from the app's own releases, but reviewers prefer source builds.
+#     The source-build route: base on io.qt.PySide.BaseApp (PySide6 matching the KDE runtime), runtime
+#     org.kde.Platform, and generate the Python modules with flatpak-pip-generator:
+#       python3 flatpak-pip-generator --runtime org.kde.Sdk//6.10 --output python3-deps "PyMuPDF>=1.25" "pyhanko>=0.25"
+#     (https://github.com/flathub/flatpak-builder-tools, pip/), add `- python3-deps.json` to modules and install
+#     Leaf itself with `pip3 install --no-deps --no-build-isolation --prefix=/app .`. PyMuPDF then builds MuPDF
+#     from source (long build) unless its manylinux wheel is used. Not done here: nothing in this repository tests it.
+#
+# Placeholders to fill in before a Flathub submission:
+#   - app id io.github.jagritvats.Leaf and the OWNER URLs: python packaging/set_app_id.py GITHUB_OWNER
+#   - sha256 of the release tarball: sha256sum leaf-<v>-linux-x86_64.tar.gz (or let flatpak-external-data-checker
+#     fill it, see x-checker-data)
+#
+# Local build (needs flatpak + flatpak-builder and the runtime; uses dist/ instead of the release URL):
+#   bash packaging/flatpak/build_local.sh
+id: io.github.jagritvats.Leaf
+runtime: org.freedesktop.Platform
+runtime-version: "25.08"
+sdk: org.freedesktop.Sdk
+command: leaf
+separate-locales: false
+
+finish-args:
+  # display: Wayland first, X11 only when there is no Wayland session
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --share=ipc
+  # GPU for Qt's EGL/OpenGL integration (Leaf draws with the raster engine, Qt still loads libEGL/libOpenGL)
+  - --device=dri
+  # Print dialog (File > Print) talks to CUPS
+  - --socket=cups
+  # Files: Leaf reads and writes next to the opened file (save, "-signed" copies of signed documents, "Reduce file
+  # size" copies, "one file per page" extraction, export folders) and reopens recent files by path. The file
+  # chooser portal alone only grants the single file picked, so those features would fail. Home access covers
+  # them; removable media and other disks still go through the file chooser portal.
+  # Stricter alternative: replace with --filesystem=xdg-documents and --filesystem=xdg-download (files elsewhere
+  # then only via the portal, and sibling outputs outside those folders fail).
+  - --filesystem=home
+  # Network: documents are never uploaded. Two user-initiated features need it:
+  #   - OCR > Add languages... downloads Tesseract language data (tessdata_fast on GitHub) on request
+  #   - digital signatures with a timestamp (PAdES B-T) contact the RFC 3161 timestamp server the user configured
+  # Flatpak has no per-feature network portal, so without this both fail; everything else works offline.
+  - --share=network
+
+modules:
+  - name: leaf
+    buildsystem: simple
+    sources:
+      - type: archive
+        url: https://github.com/jagritvats/Leaf-PDF-Viewer/releases/download/v0.1.0/leaf-0.1.0-linux-x86_64.tar.gz
+        # TODO: sha256 of the release tarball (placeholder below is not valid)
+        sha256: "0000000000000000000000000000000000000000000000000000000000000000"
+        only-arches:
+          - x86_64
+        x-checker-data:
+          type: json
+          url: https://api.github.com/repos/jagritvats/Leaf-PDF-Viewer/releases/latest
+          version-query: .tag_name | sub("^v"; "")
+          url-query: '"https://github.com/jagritvats/Leaf-PDF-Viewer/releases/download/v" + $version + "/leaf-" + $version + "-linux-x86_64.tar.gz"'
+      # launcher: run the bundle from its own folder (PyInstaller finds _internal/ next to the real executable)
+      - type: script
+        dest-filename: leaf.sh
+        commands:
+          - exec /app/lib/leaf/leaf "$@"
+    build-commands:
+      # the tarball (top folder stripped): leaf/ (PyInstaller bundle), <app-id>.desktop, <app-id>.metainfo.xml,
+      # icons/hicolor/<n>x<n>/apps/<app-id>.png
+      - mkdir -p /app/lib /app/bin
+      - cp -a leaf /app/lib/leaf
+      - install -Dm755 leaf.sh /app/bin/leaf
+      - install -Dm644 ${FLATPAK_ID}.desktop /app/share/applications/${FLATPAK_ID}.desktop
+      - install -Dm644 ${FLATPAK_ID}.metainfo.xml /app/share/metainfo/${FLATPAK_ID}.metainfo.xml
+      - cp -a icons /app/share/icons

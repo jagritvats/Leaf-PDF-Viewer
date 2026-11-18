@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  AppStream metadata for Leaf (software centers: GNOME Software, KDE Discover, Flathub).
+
+  App id: io.github.jagritvats.Leaf is a placeholder. Once the GitHub repository exists, run
+      python packaging/set_app_id.py GITHUB_OWNER
+  It renames this file, the desktop entry and the Flatpak manifest, and rewrites the id and the OWNER URLs in
+  packaging/ and .github/ (GitHub names with "-" become "_" in the id, as Flathub requires).
+
+  Screenshots: AppStream (and Flathub) need public https URLs. Each <image> below is the repository file
+  marketing/out/screens/light/NN-scene-1920x1080.png (made by marketing/shots/shoot_all.py) served from
+  raw.githubusercontent.com, so they resolve once those files are committed and pushed.
+
+  Validate: bash packaging/linux/validate.sh (appstreamcli, offline)
+-->
+<component type="desktop-application">
+  <id>io.github.jagritvats.Leaf</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <!-- TODO: <project_license>...</project_license> once Leaf's license is chosen (it bundles MuPDF, AGPL-3.0,
+       so AGPL-3.0-or-later unless an Artifex commercial license is bought). Flathub requires this tag. -->
+
+  <name>Leaf</name>
+  <summary>Edit, sign and redact PDF files on your computer</summary>
+  <developer id="io.github.jagritvats">
+    <name>jagritvats</name>
+  </developer>
+
+  <description>
+    <p>
+      Leaf is a fast PDF editor that works entirely on your computer. Your documents are opened, edited and saved
+      locally and are never uploaded anywhere.
+    </p>
+    <ul>
+      <li>Edit existing text in place, in the document's own font, size and color, with find and replace</li>
+      <li>Redact text, images and graphics for real: what is under a redaction is removed from the file</li>
+      <li>Fill in forms, create new form fields, and sign with a drawn, typed or imported signature</li>
+      <li>Digital signatures (PAdES) with your own certificate, and verification of signed documents</li>
+      <li>Recognize text (OCR) in scanned pages so they become searchable and selectable</li>
+      <li>Organize pages: reorder, rotate, insert, delete, extract, split and crop</li>
+      <li>Annotate with text boxes, highlights, notes, drawings and shapes</li>
+      <li>Watermarks, headers and footers, password protection and file size reduction</li>
+    </ul>
+    <p>
+      Every change can be undone, and saving keeps existing digital signatures valid whenever the pages are
+      unchanged.
+    </p>
+  </description>
+
+  <launchable type="desktop-id">io.github.jagritvats.Leaf.desktop</launchable>
+  <icon type="stock">io.github.jagritvats.Leaf</icon>
+
+  <url type="homepage">https://github.com/jagritvats/Leaf-PDF-Viewer</url>
+  <url type="bugtracker">https://github.com/jagritvats/Leaf-PDF-Viewer/issues</url>
+  <url type="vcs-browser">https://github.com/jagritvats/Leaf-PDF-Viewer</url>
+
+  <categories>
+    <category>Office</category>
+    <category>Viewer</category>
+    <category>Graphics</category>
+  </categories>
+
+  <keywords>
+    <keyword>PDF</keyword>
+    <keyword>editor</keyword>
+    <keyword>sign</keyword>
+    <keyword>signature</keyword>
+    <keyword>redact</keyword>
+    <keyword>form</keyword>
+    <keyword>OCR</keyword>
+    <keyword>annotate</keyword>
+  </keywords>
+
+  <provides>
+    <binary>leaf</binary>
+    <mediatype>application/pdf</mediatype>
+  </provides>
+
+  <screenshots>
+    <screenshot type="default">
+      <caption>Annotate documents with text, highlights, notes and drawings</caption>
+      <image type="source" width="1920" height="1080">https://raw.githubusercontent.com/jagritvats/Leaf-PDF-Viewer/main/marketing/out/screens/light/01-hero-annotate-1920x1080.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Edit existing text in the document's own font</caption>
+      <image type="source" width="1920" height="1080">https://raw.githubusercontent.com/jagritvats/Leaf-PDF-Viewer/main/marketing/out/screens/light/03-edit-text-1920x1080.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Redact sensitive information for real</caption>
+      <image type="source" width="1920" height="1080">https://raw.githubusercontent.com/jagritvats/Leaf-PDF-Viewer/main/marketing/out/screens/light/05-redact-1920x1080.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Fill in and sign forms</caption>
+      <image type="source" width="1920" height="1080">https://raw.githubusercontent.com/jagritvats/Leaf-PDF-Viewer/main/marketing/out/screens/light/02-forms-1920x1080.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Digital signatures with your own certificate</caption>
+      <image type="source" width="1920" height="1080">https://raw.githubusercontent.com/jagritvats/Leaf-PDF-Viewer/main/marketing/out/screens/light/06-digital-signature-1920x1080.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Make scanned pages searchable with OCR</caption>
+      <image type="source" width="1920" height="1080">https://raw.githubusercontent.com/jagritvats/Leaf-PDF-Viewer/main/marketing/out/screens/light/07-ocr-1920x1080.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Reorder, rotate and extract pages</caption>
+      <image type="source" width="1920" height="1080">https://raw.githubusercontent.com/jagritvats/Leaf-PDF-Viewer/main/marketing/out/screens/light/04-organize-pages-1920x1080.png</image>
+    </screenshot>
+  </screenshots>
+
+  <branding>
+    <color type="primary" scheme_preference="light">#8fd6a0</color>
+    <color type="primary" scheme_preference="dark">#1f6b33</color>
+  </branding>
+
+  <content_rating type="oars-1.1"/>
+
+  <requires>
+    <display_length compare="ge">768</display_length>
+  </requires>
+  <supports>
+    <control>pointing</control>
+    <control>keyboard</control>
+  </supports>
+
+  <releases>
+    <release version="0.1.0" date="2026-11-18">
+      <description>
+        <p>First release.</p>
+      </description>
+    </release>
+  </releases>
+</component>

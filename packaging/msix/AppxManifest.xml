@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  MSIX manifest template for Leaf (Microsoft Store / sideloading). packaging/msix/build_msix.ps1 fills the
+  {{...}} placeholders and packs dist/Leaf with makeappx:
+
+    {{IDENTITY_NAME}}           Package/Identity/Name from Partner Center (Product identity), e.g. 12345Owner.Leaf
+    {{PUBLISHER}}               Package/Identity/Publisher from Partner Center, e.g. CN=XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX
+                                (for sideloading: the subject of the certificate you sign with)
+    {{PUBLISHER_DISPLAY_NAME}}  your publisher display name from Partner Center
+    {{VERSION}}                 four-part version, e.g. 0.1.0.0 (the Store requires the last part to be 0)
+
+  Leaf is a Win32 (PyInstaller) app: it runs as a full-trust desktop app (EntryPoint Windows.FullTrustApplication +
+  the restricted runFullTrust capability, which the Store allows for desktop apps but asks you to justify).
+  Taskbar identity: a packaged app's AppUserModelID is <PackageFamilyName>!Leaf, assigned by Windows.
+  leaf/__main__.py sets its own id ("Leaf.PdfEditor") for the unpackaged builds; when packaged it must not
+  (see packaging/PLATFORMS.md, Microsoft Store), otherwise windows are grouped apart from the Start tile.
+-->
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:uap3="http://schemas.microsoft.com/appx/manifest/uap/windows10/3"
+  xmlns:uap10="http://schemas.microsoft.com/appx/manifest/uap/windows10/10"
+  xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  IgnorableNamespaces="uap uap3 uap10 desktop rescap">
+
+  <Identity Name="{{IDENTITY_NAME}}" Publisher="{{PUBLISHER}}" Version="{{VERSION}}" ProcessorArchitecture="x64"/>
+
+  <Properties>
+    <DisplayName>Leaf</DisplayName>
+    <PublisherDisplayName>{{PUBLISHER_DISPLAY_NAME}}</PublisherDisplayName>
+    <Logo>Assets\StoreLogo.png</Logo>
+    <Description>Edit, sign and redact PDF files on your computer.</Description>
+  </Properties>
+
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.19041.0" MaxVersionTested="10.0.26100.0"/>
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="en-us"/>
+  </Resources>
+
+  <Applications>
+    <Application Id="Leaf" Executable="Leaf.exe" EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements
+        DisplayName="Leaf"
+        Description="Edit, sign and redact PDF files on your computer."
+        BackgroundColor="transparent"
+        Square150x150Logo="Assets\Square150x150Logo.png"
+        Square44x44Logo="Assets\Square44x44Logo.png">
+        <uap:DefaultTile
+          Wide310x150Logo="Assets\Wide310x150Logo.png"
+          Square310x310Logo="Assets\Square310x310Logo.png"
+          Square71x71Logo="Assets\SmallTile.png"
+          ShortName="Leaf"/>
+      </uap:VisualElements>
+      <Extensions>
+        <!-- "Open with" for PDFs; the user picks the default app, the package never takes it over -->
+        <uap:Extension Category="windows.fileTypeAssociation">
+          <uap:FileTypeAssociation Name="pdf">
+            <uap:DisplayName>PDF document</uap:DisplayName>
+            <uap:SupportedFileTypes>
+              <uap:FileType ContentType="application/pdf">.pdf</uap:FileType>
+            </uap:SupportedFileTypes>
+          </uap:FileTypeAssociation>
+        </uap:Extension>
+      </Extensions>
+    </Application>
+    <!-- CLI-BEGIN: removed by build_msix.ps1 when the bundle has no leaf-cli.exe -->
+    <!-- Console twin for the command line: `leaf-cli text x.pdf` from any terminal (app execution alias) -->
+    <Application Id="LeafCli" Executable="leaf-cli.exe" EntryPoint="Windows.FullTrustApplication"
+      uap10:Subsystem="console" uap10:SupportsMultipleInstances="true">
+      <uap:VisualElements
+        DisplayName="Leaf (command line)"
+        Description="Leaf command line"
+        BackgroundColor="transparent"
+        Square150x150Logo="Assets\Square150x150Logo.png"
+        Square44x44Logo="Assets\Square44x44Logo.png"
+        AppListEntry="none"/>
+      <Extensions>
+        <uap3:Extension Category="windows.appExecutionAlias">
+          <uap3:AppExecutionAlias>
+            <desktop:ExecutionAlias Alias="leaf-cli.exe"/>
+          </uap3:AppExecutionAlias>
+        </uap3:Extension>
+      </Extensions>
+    </Application>
+    <!-- CLI-END -->
+  </Applications>
+
+  <Capabilities>
+    <rescap:Capability Name="runFullTrust"/>
+  </Capabilities>
+</Package>
