@@ -353,3 +353,15 @@ def test_tesseract_words_split_at_spans():
     assert [w[4] for w in words] == ["नम्", "दु", "a", "b"]
     assert [w[6] for w in words] == [0, 1, 2, 3] and {w[5] for w in words} == {0}
     assert words[0][:4] == (0, 10, 10, 20)
+
+
+def test_download_redirects_stay_on_https():
+    import urllib.request
+
+    h = D._https_only_handler()
+    req = urllib.request.Request(D.url_for("deu"))
+    nxt = h.redirect_request(req, None, 302, "Found", {}, "https://raw.githubusercontent.com/x/deu.traineddata")
+    assert nxt is not None and nxt.full_url.startswith("https://raw.githubusercontent.com/")
+    for bad in ("http://raw.githubusercontent.com/x/deu.traineddata", "ftp://example.com/deu.traineddata"):
+        with pytest.raises(D.DownloadError, match="non-HTTPS"):
+            h.redirect_request(req, None, 302, "Found", {}, bad)
