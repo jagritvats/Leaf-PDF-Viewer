@@ -195,7 +195,19 @@ def new_window():
     win.setWindowFlag(Qt.WindowType.FramelessWindowHint, True)  # lets the window be exactly LWxLH logical
     win.resize(LW, LH)
     scr = app.primaryScreen().geometry()
-    win.move(0 if ARGS.onscreen else scr.right() + 40, 0)  # off screen: the real mouse can't hover it
+    x = 0 if ARGS.onscreen else scr.right() + 40  # off screen: the real mouse can't hover it
+    screens = app.screens()
+    if not ARGS.onscreen and len(screens) > 1:
+        # monitors with different scales: park the window just outside the highest-DPI screen's free edge, so Qt
+        # and Windows agree on the screen (else text is measured for one scale and drawn for another)
+        target = max(screens, key=lambda sc: sc.devicePixelRatio())
+        g = target.geometry()
+        if g.left() <= min(sc.geometry().left() for sc in screens):
+            x = g.left() - LW - 200
+        elif g.right() >= max(sc.geometry().right() for sc in screens):
+            x = g.right() + 40
+        win.setScreen(target)
+    win.move(x, 0)
     win.show()
     win.raise_()
     win.activateWindow()
@@ -900,6 +912,48 @@ def s_night(win):
     win.a_night_mode.trigger()
     pump(0.3)
     dismiss_toasts(win)
+    settle(win, 0.5)
+    return capture(win)
+
+
+@scene(11, "start-screen")
+def s_start(win):
+    """The start screen of a returning user: recent files as page covers (copies in the work folder, dated like a
+    normal week, so no real path or file shows)."""
+    run = os.path.join(WORK, "run")
+    os.makedirs(run, exist_ok=True)
+    rec = []
+    now = time.time()
+    for name, age in (("canopy-report.pdf", 240), ("services-agreement.pdf", 3 * 3600), ("rental-application.pdf", 26 * 3600),
+                      ("invoice.pdf", 3 * 86400), ("scanned-notice.pdf", 9 * 86400)):
+        src = os.path.join(WORK, "docs", name)
+        if not os.path.exists(src):
+            continue
+        dst = os.path.join(run, name)
+        shutil.copyfile(src, dst)
+        os.utime(dst, (now - age, now - age))
+        rec.append(dst)
+    win.settings.setValue("recent", rec)
+    win.show_view("welcome")
+    win.welcome.refresh()
+    wait_until(lambda: not win.welcome._queue, msg="covers")
+    for _ in range(8):
+        win.grab()
+        pump(0.15)
+    return capture(win)
+
+
+@scene(12, "focus-mode")
+def s_focus_mode(win):
+    """View › Focus mode: just the page, a floating toolbar on top and the page/zoom bar below."""
+    cv = win.canvas
+    open_doc(win, "canopy-report.pdf")
+    dismiss_toasts(win)
+    win.a_focus_mode.trigger()
+    pump(0.3)
+    fit(win, "width")
+    cv.go_to(1)
+    pump(0.3)
     settle(win, 0.5)
     return capture(win)
 

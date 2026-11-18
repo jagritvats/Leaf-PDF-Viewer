@@ -403,12 +403,9 @@ class PropsPanel(QWidget):
         self.box_w.setSpecialValueText("Auto")
         self.box_w.setToolTip("Box width: Auto grows with the text; a fixed width wraps it (or drag the handle)")
         self.box_w.valueChanged.connect(lambda v: self._emit({"box_w": float(v)}))
-        self.pad_label = QLabel("Padding")
         bl.addWidget(self.box_w, 1)
-        bl.addWidget(self.pad_label)
-        bl.addWidget(self.pad, 1)
         self.form.addRow("Width", self.box_row)
-        self.pad_label.setVisible(False)
+        self.form.addRow("Padding", self.pad)  # its own row: one shared row made the whole panel wider
 
         self.empty = QLabel("Select an item or pick a tool")
         self.empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -426,11 +423,25 @@ class PropsPanel(QWidget):
         self._kind = "select"
         # reserve the widest layout (text tool) up front: otherwise the dock widens on the first tool pick
         # and fit-width pages re-zoom
+        self._reserved = False
+        self._reserve_width()
+        self.set_context("select", {}, "")
+
+    def _reserve_width(self) -> None:
         from .items import DEFAULTS
 
-        self.set_context("text", dict(DEFAULTS.get("text", {})), "")
+        ctx = getattr(self, "_ctx", None)
+        self.set_context("text", dict(DEFAULTS.get("text", {}), box_w=0.0), "")  # a selected text box: every row
         self.setMinimumWidth(self.minimumSizeHint().width())
-        self.set_context("select", {}, "")
+        if self._reserved and ctx is not None:
+            self.set_context(*ctx)
+
+    def showEvent(self, e) -> None:
+        if not self._reserved:  # again once polished: an app style sheet's metrics only apply from then on
+            self._reserved = True
+            self.setMinimumWidth(0)
+            self._reserve_width()
+        super().showEvent(e)
 
     def _emit(self, delta: dict) -> None:
         if self._block:
@@ -458,6 +469,7 @@ class PropsPanel(QWidget):
         self.form.setRowVisible(w, visible)
 
     def set_context(self, kind: str, props: dict, hint: str) -> None:
+        self._ctx = (kind, props, hint)
         self._block = True
         self._kind = kind
         self.title.setText(TITLES.get(kind, kind.replace("_", " ").title()))
@@ -478,7 +490,8 @@ class PropsPanel(QWidget):
         self._row(self.spacing, "spacing" in props)
         self._row(self.bg, "bg" in props)
         self._row(self.border, "border" in props)
-        self._row(self.box_row, "pad" in props or "box_w" in props)
+        self._row(self.box_row, "box_w" in props)
+        self._row(self.pad, "pad" in props)
         self.form_box.setVisible(bool(props))
         self.empty.setVisible(not props and kind in ("select", "hand"))
         if "font" in props:
@@ -508,10 +521,6 @@ class PropsPanel(QWidget):
             self.bg.set_current(props["bg"])
         if "border" in props:
             self.border.set_current(props["border"])
-        self.box_w.setVisible("box_w" in props)
-        self.pad_label.setVisible("box_w" in props and "pad" in props)
-        self.pad.setVisible("pad" in props)
-        self.form.labelForField(self.box_row).setText("Width" if "box_w" in props else "Padding")
         if "pad" in props:
             self.pad.setValue(float(props["pad"]))
         if "box_w" in props:

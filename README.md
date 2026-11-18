@@ -1,6 +1,6 @@
 # Leaf
 
-A fast, local PDF editor. Native Qt 6 UI (follows Windows 11 / KDE / GNOME light and dark themes), MuPDF engine. Nothing leaves your machine.
+A fast, local PDF editor. Qt 6 UI in a Windows 11 (Fluent) style, light and dark, with your accent color (follows the system on Windows 11, KDE and GNOME; high-contrast themes keep the system look), MuPDF engine. Nothing leaves your machine.
 
 ![Leaf in dark mode: a report with highlights and a comment thread](docs/screenshots/annotate-dark.png)
 
@@ -45,7 +45,7 @@ notarization). Leaf is AGPL-3.0, like MuPDF: anyone distributing a build must of
 
 | Area | Features |
 |---|---|
-| View | Continuous, single-page and two-page (book) layouts; Ctrl+wheel/pinch zoom at cursor; fit width/page; sharp tiles at any zoom; search (Ctrl+F); text selection + copy; clickable links with back/forward (Alt+←/→); outline panel (F8); night mode; full screen (F11) and presentation (F5); reopens each file where you left off |
+| View | Continuous, single-page and two-page (book) layouts; Ctrl+wheel/pinch zoom at cursor; fit width/page; sharp tiles at any zoom; search (Ctrl+F); text selection + copy; clickable links with back/forward (Alt+←/→); outline panel (F8); night mode; Focus mode (Ctrl+Shift+F: just the page, a floating toolbar and page/zoom bar that slide away while you read; Alt or F10 shows the menus, Esc leaves); full screen (F11) and presentation (F5); start screen with your recent files as page covers; reopens each file where you left off |
 | Annotate | Formatted text boxes (any installed font, embedded as a subset; bold/italic/underline/strike, alignment, line spacing, fill, border; any Unicode script), highlight text, sticky notes, freehand, rectangle, ellipse, line, arrow, whiteout, images; floating mini-toolbar on the selection; duplicate (Ctrl+D) |
 | Existing annotations | Annotations already in the file (from any app) can be selected, moved, restyled and deleted; untouched ones are saved byte-for-byte. Comments panel (F9) with threads, filters, inline editing and replies |
 | Forms | Fill text (multi-line, comb, max length, auto size), checkbox, radio, dropdown, list box; read-only and password fields; Tab follows document order; required fields marked; sign signature fields; reset/clear; **create new fields**; export/import data (JSON, XFDF); save a flattened copy |
@@ -117,6 +117,8 @@ leaf/
   compare.py        Compare documents (Qt-free): page alignment by text similarity, word diff, pixel diff; compare_documents(a, b) -> [Change]; view in features/compare.py
   a11y.py           accessible names for every control, "Page N of M" announcements, Tab order, high contrast, WCAG contrast helpers
   i18n.py           Qt + Leaf translations, tr(), pseudo-locale (LEAF_PSEUDO=1/2); workflow in docs/translating.md
+  style/            the look: design tokens (light/dark, accent, type), Fusion + one generated style sheet, panel
+                    headers, rounded page view, Windows 11 title bar color; off in high contrast or with LEAF_UI=classic
   welcome.py, toast.py, minibar.py, props.py, signature.py, icons.py   UI pieces
   features/         each area wires itself into the window via install(win): viewing, forms, pages, textfmt, annotations, output, decorate, history
 ```

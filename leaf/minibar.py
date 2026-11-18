@@ -33,15 +33,6 @@ class MiniToolbar(QFrame):
         self.setAccessibleName("Selection toolbar")
         self.setProperty(KEEP_EDITING, True)
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground)
-        from .a11y import high_contrast
-
-        edge = "palette(window-text)" if high_contrast() else "rgba(128,128,128,90)"  # a11y: solid edge in high contrast
-        self.setStyleSheet(f"#leafMini {{ background: palette(window); border: 1px solid {edge};"
-                           " border-radius: 8px; }"
-                           "#leafMini QToolButton { border: none; border-radius: 4px; padding: 2px; }"
-                           "#leafMini QToolButton:hover { background: rgba(128,128,128,45); }"
-                           "#leafMini QToolButton:checked { background: rgba(128,128,128,80); }"
-                           "#leafMini QToolButton::menu-indicator { image: none; width: 0; }")
         shadow = QGraphicsDropShadowEffect(self)
         shadow.setBlurRadius(18)
         shadow.setOffset(0, 3)
@@ -50,6 +41,7 @@ class MiniToolbar(QFrame):
         lay = QHBoxLayout(self)
         lay.setContentsMargins(6, 4, 6, 4)
         lay.setSpacing(2)
+        self._restyle()
 
         # text: font, B I U S, alignment
         self.font_box = FontBox()
@@ -164,10 +156,41 @@ class MiniToolbar(QFrame):
 
     def _sep(self) -> QFrame:
         f = QFrame()
+        f.setObjectName("miniSep")
         f.setFrameShape(QFrame.Shape.VLine)
         f.setFixedWidth(9)
-        f.setStyleSheet("color: rgba(128,128,128,90);")
         return f
+
+    def _restyle(self) -> None:
+        from . import style
+        from .a11y import high_contrast
+
+        if style.active():  # a popup surface with the style's radii and hover/checked tints
+            from .style.tokens import rgba
+
+            t = style.current()
+            ss = (f"#leafMini {{ background: {rgba(t.popup)}; border: 1px solid {rgba(t.stroke2)}; border-radius: {t.r_l}px; }}"
+                  f"#leafMini QToolButton {{ border: none; border-radius: {t.r_m}px; padding: 3px; background: transparent; }}"
+                  f"#leafMini QToolButton:hover {{ background: {rgba(t.hover)}; }}"
+                  f"#leafMini QToolButton:checked {{ background: {rgba(t.accent_soft)}; }}"
+                  "#leafMini QToolButton::menu-indicator { image: none; width: 0; }"
+                  "#leafMini QComboBox { min-height: 18px; padding-top: 2px; padding-bottom: 2px; }"
+                  f"#leafMini QFrame#miniSep {{ color: {rgba(t.stroke2)}; }}")
+            fx = self.graphicsEffect()
+            if fx is not None:
+                fx.setBlurRadius(24)
+                fx.setOffset(0, 6)
+                fx.setColor(QColor(0, 0, 0, 110 if t.dark else 45))
+        else:
+            edge = "palette(window-text)" if high_contrast() else "rgba(128,128,128,90)"  # a11y: solid edge in high contrast
+            ss = (f"#leafMini {{ background: palette(window); border: 1px solid {edge}; border-radius: 8px; }}"
+                  "#leafMini QToolButton { border: none; border-radius: 4px; padding: 2px; }"
+                  "#leafMini QToolButton:hover { background: rgba(128,128,128,45); }"
+                  "#leafMini QToolButton:checked { background: rgba(128,128,128,80); }"
+                  "#leafMini QToolButton::menu-indicator { image: none; width: 0; }"
+                  "#leafMini QFrame#miniSep { color: rgba(128,128,128,90); }")
+        if ss != self.styleSheet():  # setting a style sheet fires PaletteChange again
+            self.setStyleSheet(ss)
 
     # --------------------------------------------------------------- state
     def _schedule(self, *_) -> None:
@@ -309,6 +332,7 @@ class MiniToolbar(QFrame):
 
     def changeEvent(self, e) -> None:
         if e.type() == QEvent.Type.PaletteChange:
+            self._restyle()
             for b in self.findChildren(QToolButton):
                 n = b.property("icon_name")
                 if n:
