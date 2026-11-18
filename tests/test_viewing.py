@@ -175,6 +175,28 @@ def test_links_to_programs_network_and_handlers_are_refused(app, tmp_path, monke
     assert seen["unknown"][0] == "warn"
 
 
+def test_safeopen_keeps_everyday_links_easy(app):
+    """Security without friction: phone/SMS/map links and Office document links aren't refused, and common local
+    file types open with the usual question; dangerous Microsoft handlers stay blocked."""
+    from leaf import safeopen as S
+
+    for uri in ("tel:+15550100", "sms:+15550100", "geo:52.1,4.3", "webcal://example.com/cal.ics"):
+        assert S.check_uri(uri).action == "open", uri
+    assert S.check_uri("ms-word:ofe|u|https://example.com/a.docx").action == "warn"
+    for uri in ("ms-msdt:/id PCWDiagnostic", "ms-officecmd:x", "ms-settings:", "search-ms:query=x"):
+        assert S.check_uri(uri).action == "block", uri
+
+
+def test_safeopen_common_local_files_open_normally(tmp_path):
+    from leaf import safeopen as S
+
+    for name in ("notes.html", "old.doc", "data.zip", "letter.rtf"):
+        (tmp_path / name).write_text("x")
+        assert S.check_file(name, str(tmp_path)).action == "open", name
+    (tmp_path / "tool.exe").write_text("x")
+    assert S.check_file("tool.exe", str(tmp_path)).action == "block"
+
+
 def test_safeopen_names_and_paths():
     from leaf import safeopen as S
 

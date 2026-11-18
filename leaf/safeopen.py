@@ -39,8 +39,12 @@ RISKY = {".exe", ".com", ".bat", ".cmd", ".msi", ".msp", ".mst", ".scr", ".pif",
 DOCUMENTS = {".pdf", ".txt", ".md", ".csv", ".tsv", ".docx", ".xlsx", ".pptx", ".odt", ".ods", ".odp",
              ".odg", ".epub", ".xps", ".oxps", ".djvu", ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tif", ".tiff",
              ".webp", ".heic", ".jxr", ".mp3", ".wav", ".ogg", ".flac", ".m4a", ".mp4", ".m4v", ".mov", ".webm",
-             ".mkv", ".avi"}
+             ".mkv", ".avi", ".htm", ".html", ".rtf", ".doc", ".xls", ".ppt", ".zip", ".svg"}
 WEB_SCHEMES = {"http", "https", "mailto"}
+# everyday links on business cards, brochures and forms: phone, SMS, maps, calendar invites. Asked as usual.
+EVERYDAY_SCHEMES = {"tel", "callto", "sms", "sip", "sips", "facetime", "geo", "maps", "bingmaps", "webcal"}
+# Office document links (e.g. ms-word:ofe|u|https://...): common in company PDFs, so warned, not refused
+OFFICE_SCHEMES = {"ms-word", "ms-excel", "ms-powerpoint", "ms-visio", "ms-access", "ms-project", "ms-publisher"}
 # schemes that start programs, reach network shares or run script: never opened from a document
 # (and every "ms-..." scheme: ms-msdt, ms-officecmd, ms-settings, ...)
 BLOCKED_SCHEMES = {"javascript", "vbscript", "data", "jar", "shell", "search", "search-ms", "mk", "its", "mhtml",
@@ -149,6 +153,11 @@ def check_uri(uri: str, base_dir: str | None = None) -> Verdict:
         if scheme != "mailto" and not url.host():
             return Verdict("block", raw, "The link isn't a valid web address.")
         return Verdict("open", url.toString())
+    if scheme in EVERYDAY_SCHEMES:
+        return Verdict("open", url.toString())
+    if scheme in OFFICE_SCHEMES:
+        return Verdict("warn", url.toString(), "This link opens a document in Microsoft Office. Open it only if you "
+                                               "trust where this document came from.")
     if scheme in BLOCKED_SCHEMES or scheme.startswith("ms-"):
         return Verdict("block", raw, f"Leaf doesn't open “{shown(scheme)}:” links from a document: they can run "
                                      "programs or reach network locations.")
