@@ -283,13 +283,21 @@ def _tabbable(w: QWidget, win) -> bool:
 def focus_chain(win) -> list[QWidget]:
     """Every widget that can take Tab focus, in the intended order (hidden ones too, so they land in the right
     place when they appear)."""
-    order, w = [], win
+    # PySide makes the widget nextInFocusChain() returns a child of the one it was called on (its return-value
+    # heuristic), so a walk chains every wrapper to the one before it, and the window to the last widget. Deleting a
+    # Python-made widget then invalidates the wrappers after it (menus, panel toggle actions...) although Qt keeps
+    # them: "Internal C++ object already deleted". So: stop at the last widget instead of asking it for the window,
+    # and hand every wrapper back to the window afterwards.
+    order, w, last = [], win, win.previousInFocusChain()
     for _ in range(20000):  # the existing chain order is kept inside each segment
+        if w is last:
+            break
         w = w.nextInFocusChain()
         if w is win or w is None:
             break
         if _tabbable(w, win):
             order.append(w)
+    win.findChildren(QWidget)  # (findChildren makes the window their parent again)
     roots = focus_segments(win)
     buckets: list[list[QWidget]] = [[] for _ in range(len(roots) + 1)]
     for x in order:

@@ -262,6 +262,24 @@ def test_focus_order_main_window(app, win, tmp_path):  # noqa: F811
     assert chain.index(win.canvas) < chain.index(win.page_spin)
 
 
+def test_focus_order_walk_keeps_wrappers_alive(app, win):  # noqa: F811
+    """Walking the focus chain must not tie the window's Python wrapper to its last widget: deleting that widget
+    (a panel's tab close button when Qt drops a tab bar, any Python-made widget) invalidated the menus' and panel
+    toggles' wrappers, so opening a document left Presentation disabled and Focus mode came up without its bars."""
+    import shiboken6
+    from PySide6.QtCore import QEvent
+    from PySide6.QtWidgets import QWidget
+
+    pump(app, 0.05)
+    held = [win.a_comments_panel, win.a_outline, win.a_sidebar, win.recent_menu, win.menuBar()]
+    gone = QWidget(win)  # made after the start-up walk: the last widget in the focus chain
+    a11y.fix_focus_order(win)
+    gone.deleteLater()
+    del gone
+    QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)  # (an event loop does this; pump doesn't)
+    assert all(shiboken6.isValid(o) for o in held)
+
+
 def test_contrast_helpers(app):  # noqa: F811
     assert a11y.contrast_ratio("#000000", "#ffffff") == pytest.approx(21.0)
     assert a11y.contrast_ratio(a11y.readable("#c0392b", "#202020"), "#202020") >= 4.5
