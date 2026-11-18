@@ -5,3 +5,5 @@ PKGBUILD text eol=lf
 *.traineddata binary
 *.png binary
 *.ico binary
+*.desktop text eol=lf
+*.metainfo.xml text eol=lf
