@@ -87,6 +87,8 @@ def is_network_path(p: str) -> bool:
     p = str(p).strip()
     if sys.platform == "win32":
         s = p.replace("/", "\\")
+        if re.match(r"\\\\[?.]\\[A-Za-z]:(\\|$)", s):  # \\?\C:\... (long-path form of a local drive): not network
+            return False
         return s.startswith("\\\\") or s.startswith("\\??\\")
     return p.startswith("//")
 

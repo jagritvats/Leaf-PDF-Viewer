@@ -187,6 +187,9 @@ def test_safeopen_names_and_paths():
         for p in (r"\\srv\s\x.pdf", r"\/srv/s/x.pdf", "//srv/s/x.pdf", r"\\?\UNC\srv\s\x.pdf", r"\??\UNC\srv\s\x"):
             assert S.is_network_path(p), p
         assert S.is_risky("a.exe::$DATA") and not S.is_network_path(r"C:\x.pdf")
+        assert S.is_network_path(r"\\.\pipe\x")
+        for p in (r"\\?\C:\a very long\path\x.pdf", r"\\.\D:\x.pdf"):  # long-path form of a local drive: still local
+            assert not S.is_network_path(p), p
 
 
 def test_go_to_history_only_for_jumps(app, lpdf):

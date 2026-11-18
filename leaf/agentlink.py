@@ -165,9 +165,11 @@ def file_refs(data) -> list[str]:
 def check_file_refs(data, allow=None) -> list[str]:
     """Problems with the files an agent's edit set reads: they must be absolute, local and exist; `allow(path)`
     may veto more (the MCP server's root folders)."""
+    from .safeopen import is_network_path
+
     problems = []
     for f in file_refs(data):
-        if not os.path.isabs(f) or f.startswith(("\\\\", "//")) or "://" in f:
+        if not os.path.isabs(f) or is_network_path(f) or "://" in f:
             problems.append(f"file {f!r}: agents must use absolute local paths")
         elif not os.path.isfile(f):
             problems.append(f"file {f!r} doesn't exist")
@@ -176,6 +178,14 @@ def check_file_refs(data, allow=None) -> list[str]:
             if why:
                 problems.append(why)
     return problems
+
+
+def _local_file(path) -> bool:
+    """An absolute path of an existing local file (checked without touching the network)."""
+    from .safeopen import is_network_path
+
+    return (isinstance(path, str) and os.path.isabs(path) and not is_network_path(path) and "://" not in path
+            and os.path.isfile(path))
 
 
 # ------------------------------------------------------------------ the link (Qt)
@@ -359,7 +369,7 @@ def _link_class():
             win = find_window(req)
             if win is None:
                 path = req.get("path")
-                if not (req.get("open") and isinstance(path, str) and os.path.isabs(path) and os.path.isfile(path)):
+                if not (req.get("open") and _local_file(path)):
                     return {"ok": False, "error": "the document isn't open in Leaf (pass an absolute 'path' and "
                                                   "open: true to open it)"}
                 p.path = os.path.abspath(path)
