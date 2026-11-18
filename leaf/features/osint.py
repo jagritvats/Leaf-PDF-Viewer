@@ -2,6 +2,8 @@
 Taskbar progress / keep-awake are called from the long-running tasks themselves (osint.progress)."""
 from __future__ import annotations
 
+import os
+
 from .. import osint
 
 _page_registered = False
@@ -34,7 +36,7 @@ def _register_settings_page() -> None:
     try:
         register_page("system", "System", settings_page, order=75,
                       keywords="recent documents jump list taskbar progress sleep awake pen pressure tablet stylus "
-                               "eraser palm touch")
+                               "eraser palm touch default app pdf open with associate")
         _page_registered = True
     except Exception:  # noqa: BLE001
         pass
@@ -73,5 +75,43 @@ def settings_page(win):
     note.setWordWrap(True)
     note.setEnabled(False)
     lay.addWidget(note)
+    _default_app_row(win, lay)
     lay.addStretch()
     return w
+
+
+def _default_app_row(win, lay) -> None:
+    """Default PDF app: the button runs win.a_make_default (features/share.py); a portable copy that registered
+    itself can unregister here."""
+    from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton
+
+    from .. import shellint
+
+    act = getattr(win, "a_make_default", None)
+    if act is None:
+        return
+    lay.addSpacing(8)
+    lay.addWidget(QLabel("<b>Default PDF app</b>"))
+    row = QHBoxLayout()
+    b = QPushButton("Make Leaf the default PDF app…")
+    b.setObjectName("system_make_default")
+    b.setToolTip(act.toolTip())
+    b.clicked.connect(act.trigger)
+    row.addWidget(b)
+    exe = shellint.frozen_exe()
+    mine = shellint.registered_exe() if shellint.IS_WIN and exe else None
+    if mine and os.path.normcase(mine) == os.path.normcase(exe) and not shellint.in_msix() \
+            and not shellint.installed_by_installer():
+        u = QPushButton("Remove from Windows' app lists…")
+        u.setObjectName("system_unregister")
+
+        def unregister():
+            from .share import unregister_portable
+
+            if unregister_portable(win):
+                u.hide()
+
+        u.clicked.connect(unregister)
+        row.addWidget(u)
+    row.addStretch()
+    lay.addLayout(row)
