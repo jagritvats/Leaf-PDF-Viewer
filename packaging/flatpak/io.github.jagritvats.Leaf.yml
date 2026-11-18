@@ -60,7 +60,7 @@ modules:
     buildsystem: simple
     sources:
       - type: archive
-        url: https://github.com/jagritvats/Leaf-PDF-Viewer/releases/download/v0.2.1/leaf-0.2.1-linux-x86_64.tar.gz
+        url: https://github.com/jagritvats/Leaf-PDF-Viewer/releases/download/v0.2.2/leaf-0.2.2-linux-x86_64.tar.gz
         sha256: "90ee32f0e3bff6185f5ca0be2ce3d90fb85bddf063645ac401f90c799c651436"
         only-arches:
           - x86_64

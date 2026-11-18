@@ -121,6 +121,13 @@
   </supports>
 
   <releases>
+    <release version="0.2.2" date="2026-11-18">
+      <description>
+        <p>Share documents (share sheet, copy as file, email, show in folder), right-click menus on pages, text,
+        comments and links, "Combine with Leaf" for several PDFs, and Leaf can now be chosen as the default PDF app.
+        Security: links in documents can no longer start programs or reach network shares.</p>
+      </description>
+    </release>
     <release version="0.2.1" date="2026-11-18">
       <description>
         <p>Fixes Leaf using a full CPU core while idle, menu commands (Presentation, page modes, night mode) staying

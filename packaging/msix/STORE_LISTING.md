@@ -69,7 +69,7 @@ The display name is fixed: `-DisplayName "Leaf PDF Editor"`.
 
 ## 5. Packages
 
-Upload `Leaf-0.2.1-windows-x64.msix` (built with `-NoCli`). The build needs the identity values from section 1. Device family: Desktop
+Upload `Leaf-0.2.2-windows-x64.msix` (built with `-NoCli`). The build needs the identity values from section 1. Device family: Desktop
 (set by the package).
 
 ---
