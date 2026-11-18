@@ -195,3 +195,29 @@ def test_start_screen_recent_menu(app, windows, driver, tmp_path, calls):  # noq
     pump(0.05)
     assert calls["reveal"] == [(src,)]
     driver.check()
+
+
+def test_canvas_text_box_menu(app, windows, driver, tmp_path):  # noqa: F811
+    from PySide6.QtCore import Qt
+
+    from leaf.items import TextItem
+    from tests.e2e_kit import click, key, type_text
+
+    src = make_pdf(str(tmp_path / "doc.pdf"), rotate_second=False, form=False)
+    win = windows()
+    open_in(win, src)
+    cv, vp = win.canvas, win.canvas.viewport()
+    key(cv, Qt.Key.Key_T)
+    click(vp, page_point(win, 0, 100, 500))
+    type_text(cv, "Box text")
+    win._commit_edits()
+    cv.set_tool("select")
+    pump(0.05)
+    box = next(i for i in cv.order[0].overlays() if isinstance(i, TextItem))
+    r = box.mapRectToParent(box.boundingRect())
+    seen: list = []
+    driver.on("menu", record_menu(seen, "Duplicate"))
+    right_click(win, 0, r.center().x(), r.center().y())
+    assert seen and seen[0][0] == "Edit text" and "Style…" in seen[0] and "Delete" in seen[0]
+    assert len([i for i in cv.order[0].overlays() if isinstance(i, TextItem)]) == 2
+    driver.check()
