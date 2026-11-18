@@ -44,7 +44,7 @@ conflicts=('leaf-pdf')
 # PyInstaller executables carry their archive at the end of the file: stripping would destroy it
 options=('!strip' '!debug')
 source_x86_64=("leaf-$pkgver-linux-x86_64.tar.gz::$url/releases/download/v$pkgver/leaf-$pkgver-linux-x86_64.tar.gz")
-sha256sums_x86_64=('90ee32f0e3bff6185f5ca0be2ce3d90fb85bddf063645ac401f90c799c651436')
+sha256sums_x86_64=('cc10df8f8f901ded483e9eff9b4c605840b0c36f3c72cc67ec21fda4a6b94901')
 
 package() {
   cd "leaf-$pkgver-linux-x86_64"
