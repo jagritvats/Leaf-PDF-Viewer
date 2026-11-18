@@ -473,6 +473,12 @@ class Renderer:
         self.thumbs[key] = fn
         self._kick()
 
+    def thumb_queued(self, key, async_key) -> bool:
+        """A thumbnail for `key` is already waiting (or its async render is queued or running): asking again from
+        every paint would re-arm the render timer each frame."""
+        return (key in self.thumbs or async_key in self.asyncs
+                or any(v[0] == async_key for v in self.async_inflight.values()))
+
     def render_async(self, key, ref: PageRef, scale: float, done) -> None:
         """Queue a whole-page render of `ref` at `scale`; `done(QImage)` is called on the GUI thread.
 
@@ -505,6 +511,10 @@ class Renderer:
     def _tick(self) -> None:
         t0 = time.perf_counter()
         remote = self._remote() and self.canvas.doc is not None
+        if remote:
+            if self.inflight or self.async_inflight:
+                self._poll()  # collect finished pages here too: a busy GUI must never starve the 5 ms poll timer
+                remote = self._remote()  # (the poll drops a worker that died)
         if remote:
             self._dispatch()
             if self.inflight or self.async_inflight:

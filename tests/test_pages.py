@@ -257,6 +257,27 @@ def test_thumbnail_rerenders_after_rotate(app, pdf):
     sb.hide()
 
 
+def test_repaints_do_not_requeue_a_pending_thumbnail(app, pdf):
+    """Every paint asks for missing thumbnails. A thumbnail that is already queued must not be queued again: that
+    re-armed the render timer on each frame, spun the GUI and starved the render worker's results (0.2.0 self-test)."""
+    c = canvas_for(pdf)
+    sb = Sidebar(c)
+    sb.rebuild()
+    uid = c.doc.pages[0].uid
+    r = c.renderer
+    r.timer.stop()
+    calls = []
+    orig = r.want_thumb
+    r.want_thumb = lambda key, fn: (calls.append(key), orig(key, fn))
+    for _ in range(5):
+        assert sb.thumb(uid) is None
+    assert len(calls) == 1
+    r.thumbs.clear()
+    r.asyncs[("t", id(sb), uid)] = (c.doc.pages[0], 0.1, lambda img: None)  # waiting for the worker
+    assert sb.thumb(uid) is None and len(calls) == 1
+    r.asyncs.clear()
+
+
 def test_page_tooltip(app, pdf):
     c = canvas_for(pdf)
     tip = P.page_tooltip(c.doc, c.doc.pages[1], 1)

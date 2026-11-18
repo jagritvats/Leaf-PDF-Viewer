@@ -254,11 +254,15 @@ class Sidebar(QListWidget):
             return None
         entry = self._thumbs.get(uid)
         want = self._px_width()
+        r = self.canvas.renderer
+        key = (id(self), uid)
         if entry is None or entry[0] != (ref.rotation, ref.crop):  # crop: optimize
-            self.canvas.renderer.want_thumb((id(self), uid), lambda: self._render(ref))
+            if not r.thumb_queued(key, ("t", id(self), uid)):
+                r.want_thumb(key, lambda: self._render(ref))
             return None
         if abs(entry[1] - want) > want * 0.15:  # size changed: keep showing the old one until the new arrives
-            self.canvas.renderer.want_thumb((id(self), uid), lambda: self._render(ref))
+            if not r.thumb_queued(key, ("t", id(self), uid)):
+                r.want_thumb(key, lambda: self._render(ref))
         return entry[2]
 
     def _px_width(self) -> int:
