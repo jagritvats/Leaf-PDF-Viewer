@@ -1,7 +1,7 @@
 # Pack the PyInstaller bundle (dist\Leaf) as an MSIX for the Microsoft Store or sideloading. From the repo root:
 #   pwsh packaging\msix\build_msix.ps1                                   # unsigned, placeholder identity
 #   pwsh packaging\msix\build_msix.ps1 -IdentityName 12345Owner.Leaf -Publisher "CN=XXXXXXXX-..." `
-#        -PublisherDisplayName "Owner"                                   # Store upload (the Store signs it)
+#        -PublisherDisplayName "Owner" -DisplayName "Leaf PDF Editor"     # Store upload (the Store signs it); -DisplayName = reserved name
 #   pwsh packaging\msix\build_msix.ps1 -Publisher "CN=Leaf Dev" -CertPath dev.pfx -CertPassword ...  # sideload test
 # Needs the Windows 10/11 SDK (makeappx.exe; makepri.exe and signtool.exe optional), nothing is installed here.
 # Output: dist\Leaf-<version>-windows-x64<suffix>.msix
@@ -11,6 +11,7 @@ param(
     [string]$IdentityName = "OWNER.Leaf",
     [string]$Publisher = "CN=Leaf Dev",
     [string]$PublisherDisplayName = "Leaf",
+    [string]$DisplayName = "Leaf",
     [string]$Suffix = "",
     [string]$OutDir = "dist",
     [string]$CertPath = "",
@@ -56,6 +57,7 @@ if ($LASTEXITCODE) { throw "make_assets.py failed" }
 $manifest = Get-Content packaging\msix\AppxManifest.xml -Raw
 $manifest = $manifest.Replace("{{IDENTITY_NAME}}", $IdentityName).Replace("{{PUBLISHER}}", $Publisher)
 $manifest = $manifest.Replace("{{PUBLISHER_DISPLAY_NAME}}", $PublisherDisplayName).Replace("{{VERSION}}", $msixVersion)
+$manifest = $manifest.Replace("{{DISPLAY_NAME}}", $DisplayName)
 if (-not (Test-Path (Join-Path $stage "leaf-cli.exe"))) {
     $manifest = [regex]::Replace($manifest, '(?s)\s*<!-- CLI-BEGIN.*?<!-- CLI-END -->', '')
     Write-Host "no leaf-cli.exe in the bundle: console alias left out"

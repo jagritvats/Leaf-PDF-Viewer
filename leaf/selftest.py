@@ -51,7 +51,9 @@ def run() -> int:
         tmp = tempfile.mkdtemp(prefix="leaf-selftest-")
         src, out = os.path.join(tmp, "in.pdf"), os.path.join(tmp, "out.pdf")
         _make_pdf(src)
-        log.append(f"MuPDF {pymupdf.mupdf_version}, Qt platform {app.platformName()}")
+        from . import __version__
+
+        log.append(f"Leaf {__version__}, MuPDF {pymupdf.mupdf_version}, Qt platform {app.platformName()}")
 
         from .features import NAMES
 

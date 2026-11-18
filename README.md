@@ -4,7 +4,7 @@ A fast, local PDF editor. Qt 6 UI in a Windows 11 (Fluent) style, light and dark
 
 ![Leaf in dark mode: a report with highlights and a comment thread](docs/screenshots/annotate-dark.png)
 
-![Editing existing text in place, light mode](docs/screenshots/edit-text-light.png)
+![The start screen in light mode: recent files as page previews](docs/screenshots/start-screen-light.png)
 
 Downloads: [Releases](https://github.com/jagritvats/Leaf-PDF-Viewer/releases). Contributing: [CONTRIBUTING.md](CONTRIBUTING.md).
 

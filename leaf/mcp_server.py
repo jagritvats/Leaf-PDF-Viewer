@@ -29,12 +29,9 @@ class ToolError(Exception):
 
 
 def _version() -> str:
-    try:
-        from importlib.metadata import version
+    from . import __version__  # (package metadata is not bundled in packaged builds)
 
-        return version("leaf")
-    except Exception:  # noqa: BLE001
-        return "0.1.0"
+    return __version__
 
 
 # ===================================================================== paths

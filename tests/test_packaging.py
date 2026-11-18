@@ -253,3 +253,16 @@ def test_set_app_id_dry_run(capsys):
     assert f"{APP_ID}.metainfo.xml" in out  # would be renamed
     assert _app_id() == APP_ID  # dry run changed nothing
 
+
+
+def test_version_is_consistent():
+    """One version everywhere: pyproject, leaf.__version__, the newest AppStream release, Inno Setup, AUR."""
+    import re
+
+    from leaf import __version__
+
+    assert re.search(r'^version = "([^"]+)"', _read("pyproject.toml"), re.M).group(1) == __version__
+    meta = ET.parse(os.path.join(LINUX, f"{APP_ID}.metainfo.xml")).getroot()
+    assert meta.find("releases/release").get("version") == __version__
+    assert f'#define Version "{__version__}"' in _read("packaging", "leaf.iss")
+    assert f"pkgver={__version__}\n" in _read("packaging", "aur", "PKGBUILD")

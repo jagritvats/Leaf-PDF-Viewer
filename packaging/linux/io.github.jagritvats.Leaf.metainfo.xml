@@ -121,6 +121,12 @@
   </supports>
 
   <releases>
+    <release version="0.2.0" date="2026-11-18">
+      <description>
+        <p>A new look that follows Windows 11 and your accent color, a start screen that shows your recent files as
+        page previews, and Focus mode (Ctrl+Shift+F) for distraction-free reading.</p>
+      </description>
+    </release>
     <release version="0.1.0" date="2026-11-18">
       <description>
         <p>First release.</p>

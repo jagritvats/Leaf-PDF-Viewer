@@ -1,11 +1,11 @@
 ; Inno Setup script for the Windows installer. Build dist\Leaf first (packaging\leaf.spec), then:
-;   iscc /DVersion=0.1.0 packaging\leaf.iss      -> dist\Leaf-<version>-windows-x64-setup.exe
+;   iscc /DVersion=0.2.0 packaging\leaf.iss      -> dist\Leaf-<version>-windows-x64-setup.exe
 ; OCR variant (built with LEAF_BUNDLE_OCR=1 into dist\ocr\Leaf):
-;   iscc /DVersion=0.1.0 /DSourceDir=..\dist\ocr\Leaf /DSuffix=-ocr packaging\leaf.iss
+;   iscc /DVersion=0.2.0 /DSourceDir=..\dist\ocr\Leaf /DSuffix=-ocr packaging\leaf.iss
 ; Per-user install (no admin prompt). Registers Leaf under "Open with" for .pdf without taking over the default app.
 
 #ifndef Version
-  #define Version "0.1.0"
+  #define Version "0.2.0"
 #endif
 #ifndef SourceDir
   #define SourceDir "..\dist\Leaf"

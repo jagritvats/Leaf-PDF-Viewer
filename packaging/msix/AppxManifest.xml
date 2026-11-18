@@ -7,6 +7,7 @@
     {{PUBLISHER}}               Package/Identity/Publisher from Partner Center, e.g. CN=XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX
                                 (for sideloading: the subject of the certificate you sign with)
     {{PUBLISHER_DISPLAY_NAME}}  your publisher display name from Partner Center
+    {{DISPLAY_NAME}}            the app name reserved in Partner Center (the Store rejects a package whose name differs)
     {{VERSION}}                 four-part version, e.g. 0.1.0.0 (the Store requires the last part to be 0)
 
   Leaf is a Win32 (PyInstaller) app: it runs as a full-trust desktop app (EntryPoint Windows.FullTrustApplication +
@@ -27,7 +28,7 @@
   <Identity Name="{{IDENTITY_NAME}}" Publisher="{{PUBLISHER}}" Version="{{VERSION}}" ProcessorArchitecture="x64"/>
 
   <Properties>
-    <DisplayName>Leaf</DisplayName>
+    <DisplayName>{{DISPLAY_NAME}}</DisplayName>
     <PublisherDisplayName>{{PUBLISHER_DISPLAY_NAME}}</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
     <Description>Edit, sign and redact PDF files on your computer.</Description>
@@ -44,7 +45,7 @@
   <Applications>
     <Application Id="Leaf" Executable="Leaf.exe" EntryPoint="Windows.FullTrustApplication">
       <uap:VisualElements
-        DisplayName="Leaf"
+        DisplayName="{{DISPLAY_NAME}}"
         Description="Edit, sign and redact PDF files on your computer."
         BackgroundColor="transparent"
         Square150x150Logo="Assets\Square150x150Logo.png"

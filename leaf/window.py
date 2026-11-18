@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout, QWidget,
 )
 
+from . import __version__
 from . import commands as C
 from . import pageops
 from .canvas import Canvas
@@ -432,7 +433,7 @@ class MainWindow(QMainWindow):
         # explicit names: the shortcut settings key must not change with the language (shortcuts.ensure_names)
         m.addAction(tr("&Keyboard shortcuts"), self.show_shortcuts).setObjectName("a_help_keyboard_shortcuts")
         m.addAction(tr("&About Leaf"), lambda: QMessageBox.about(
-            self, tr("About Leaf"), f"<b>Leaf</b> 0.1 - a fast, local PDF editor.<br>Engine: MuPDF {pymupdf.mupdf_version}<br>"
+            self, tr("About Leaf"), f"<b>Leaf</b> {__version__} - a fast, local PDF editor.<br>Engine: MuPDF {pymupdf.mupdf_version}<br>"
             "Nothing leaves your computer.")).setObjectName("a_help_about_leaf")
 
     def _build_toolbar(self) -> None:
