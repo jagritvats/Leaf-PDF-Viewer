@@ -74,6 +74,19 @@ def test_style_active_and_window_dressed(app, windows):  # noqa: F811
     pal.hide()
 
 
+def test_idle_window_does_not_resync_panels(app, windows, doc):  # noqa: F811
+    """Dressing a panel tab bar again (setElideMode relayouts it even unchanged) posted a LayoutRequest that queued
+    the next sync: a 0 ms loop at full CPU that also repainted the panel corners."""
+    win = windows()
+    open_in(win, doc)
+    win.comments_dock.show()  # a tab group on the right
+    pump(0.2)
+    ticks = []
+    win.docks._later.timeout.connect(lambda: ticks.append(1))
+    pump(0.5)
+    assert len(ticks) <= 2
+
+
 def test_page_hits_ignore_the_shadow_margin(app, windows, doc):  # noqa: F811
     win = windows()
     open_in(win, doc)
