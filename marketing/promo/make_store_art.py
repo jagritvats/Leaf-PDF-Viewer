@@ -1,4 +1,4 @@
-"""Microsoft Store listing logos: 9:16 poster art and 1:1 box art, on the package's green plate.
+"""Microsoft Store listing logos: 9:16 poster art, 1:1 box art and 1:1 app tile icons, on the package's green plate.
 
     python marketing/promo/make_store_art.py        -> marketing/out/promo/store-*.png
 
@@ -57,6 +57,10 @@ def main() -> list[str]:
     for kind, (w, h) in (("poster", (1440, 2160)), ("poster", (720, 1080)), ("box", (2160, 2160)), ("box", (1080, 1080))):
         path = os.path.join(OUT, f"store-{kind}-{w}x{h}.png")
         art(w, h).save(path, "PNG")
+        written.append(path)
+    for n in (300, 150, 71):  # 1:1 app tile icons: too small for the name, so the leaf alone (like the MSIX tiles)
+        path = os.path.join(OUT, f"store-tile-{n}x{n}.png")
+        A.render(n, n, 0.8).convertToFormat(QImage.Format.Format_RGB32).save(path, "PNG")
         written.append(path)
     return written
 
