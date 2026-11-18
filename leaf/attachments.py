@@ -21,14 +21,10 @@ from PySide6.QtWidgets import (QAbstractItemView, QDialog, QDialogButtonBox, QFi
                                QLabel, QLineEdit, QMessageBox, QPushButton, QTreeWidget, QTreeWidgetItem, QVBoxLayout,
                                QWidget)
 
+from .safeopen import RISKY, is_risky, mark_untrusted, safe_filename, shown  # noqa: F401 - RISKY: re-exported
+
 _ids = itertools.count(1)
 ROLE = Qt.ItemDataRole.UserRole + 1
-# opening these runs code (or a script host); asked about first
-RISKY = {".exe", ".com", ".bat", ".cmd", ".msi", ".msp", ".scr", ".pif", ".cpl", ".dll", ".jar", ".js", ".jse", ".vbs",
-         ".vbe", ".wsf", ".wsh", ".ps1", ".psm1", ".hta", ".lnk", ".reg", ".sh", ".bash", ".zsh", ".command", ".app",
-         ".py", ".pyw", ".pl", ".rb", ".php", ".appimage", ".deb", ".rpm", ".dmg", ".pkg", ".run", ".bin", ".desktop",
-         ".url", ".scf", ".inf", ".msc", ".gadget", ".application", ".appx", ".msix", ".xll", ".xlam", ".docm",
-         ".xlsm", ".pptm", ".iso", ".img", ".vhd", ".vhdx"}
 
 
 @dataclass(frozen=True)
@@ -39,10 +35,6 @@ class Attachment:
     data: bytes | None = field(default=None, compare=False, repr=False)  # content of a file added in Leaf
     size: int = 0
     id: int = field(default_factory=lambda: next(_ids))
-
-
-def is_risky(name: str) -> bool:
-    return os.path.splitext(name.strip().lower())[1] in RISKY
 
 
 def source_files(doc) -> list[Attachment]:
@@ -255,7 +247,7 @@ def fmt_size(n: int) -> str:
 # ------------------------------------------------------------------------------------------------- seams (tests)
 def confirm_risky(parent, name: str) -> bool:
     r = QMessageBox.warning(parent, "Open attachment",
-                            f"“{name}” is a program or script. Opening it can run code on your computer.\n\n"
+                            f"“{shown(name)}” is a program or script. Opening it can run code on your computer.\n\n"
                             "Open it only if you trust where this document came from.",
                             QMessageBox.StandardButton.Open | QMessageBox.StandardButton.Cancel,
                             QMessageBox.StandardButton.Cancel)
@@ -299,15 +291,16 @@ _temp_dir: str | None = None
 
 
 def temp_copy(name: str, data: bytes) -> str:
-    """Write an attachment to a private temp folder (a fresh sub-folder per file, its own name kept)."""
+    """Write an attachment to a private temp folder (a fresh sub-folder per file, its own name kept as far as it is
+    a safe file name), marked as coming from the internet."""
     global _temp_dir
     if _temp_dir is None or not os.path.isdir(_temp_dir):
         _temp_dir = tempfile.mkdtemp(prefix="leaf-attachments-")
     d = tempfile.mkdtemp(dir=_temp_dir)
-    safe = "".join(c for c in os.path.basename(name.replace("\\", "/")) if c not in '<>:"/\\|?*' and ord(c) >= 32)
-    path = os.path.join(d, safe.strip(" .") or "attachment")
+    path = os.path.join(d, safe_filename(name))
     with open(path, "wb") as f:
         f.write(data)
+    mark_untrusted(path)
     return path
 
 
@@ -524,7 +517,7 @@ class AttachmentsPanel(QWidget):
         except Exception as ex:  # noqa: BLE001
             QMessageBox.warning(self, "Open attachment", f"Couldn't read the attachment:\n{ex}")
             return None
-        if is_risky(name) and not confirm_risky(self, name):
+        if is_risky(safe_filename(name)) and not confirm_risky(self, name):  # judged by the name it's written under
             return None
         path = temp_copy(name, data)
         open_url(QUrl.fromLocalFile(path))
@@ -534,13 +527,14 @@ class AttachmentsPanel(QWidget):
         if row is None:
             return None
         name = row[1].name if row[0] == "file" else row[1][2]
-        path = ask_save_path(self, name)
+        path = ask_save_path(self, safe_filename(name))
         if not path:
             return None
         try:
             _, data = self.data_of(row)
             with open(path, "wb") as f:
                 f.write(data)
+            mark_untrusted(path)
         except Exception as ex:  # noqa: BLE001
             QMessageBox.warning(self, "Save attachment", f"Couldn't save the attachment:\n{ex}")
             return None
