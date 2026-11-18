@@ -27,7 +27,7 @@ process when the build has an engine. Details, sizes and per-platform status: [p
 
 | Platform | How | Output | Status |
 |---|---|---|---|
-| Windows | `uv sync --group build` · `uv run python packaging/make_icons.py` · `uv run pyinstaller --noconfirm packaging/leaf.spec` · optional installer: `iscc packaging\leaf.iss` (Inno Setup 6.3+) | `dist/Leaf/Leaf.exe` (126 MB, zip 57 MB), `Leaf-<v>-windows-x64-setup.exe` | verified locally (installer: CI) |
+| Windows | `uv sync --group build` · `uv run python packaging/make_icons.py` · `uv run pyinstaller --noconfirm packaging/leaf.spec` · optional installer: `iscc packaging\leaf.iss` (Inno Setup 6.3+) | `dist/Leaf/Leaf.exe` (151 MB, zip 75 MB), `Leaf-<v>-windows-x64-setup.exe` (49 MB) | verified locally, installer included (silent install, self-test, clean uninstall) |
 | Linux | `bash packaging/build_linux.sh` (on Linux or WSL; build on the oldest distro you target, glibc 2.34+) | `dist/leaf-<v>-linux-x86_64.tar.gz`, AppImage if `appimagetool` is available | verified in WSL (tarball 90 MB, AppImage 84 MB) |
 | macOS | needs a Mac: the GitHub Actions workflow (`.github/workflows/build.yml`) builds it on `macos-14` | `Leaf-<v>-macos-arm64.dmg` (ad-hoc signed, macOS 14+) | prepared (CI) |
 
