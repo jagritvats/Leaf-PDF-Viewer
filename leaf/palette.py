@@ -156,7 +156,7 @@ class _Delegate(QStyledItemDelegate):
             fg = pal.color(QPalette.ColorGroup.Active, role)
             fg.setAlphaF(0.6)
         muted = pal.color(QPalette.ColorGroup.Active, role)
-        muted.setAlphaF(0.7 if selected else 0.55)
+        muted.setAlphaF(0.78 if selected else 0.7)  # a11y: group and shortcut stay AA (4.5:1) on the popup
         r = opt.rect.adjusted(12, 0, -12, 0)
         fm = QFontMetrics(opt.font)
         p.save()
@@ -250,7 +250,30 @@ class CommandPalette(QFrame):
         self._fit()
 
     # ------------------------------------------------------------------- ui
+    def _restyle(self) -> None:
+        """Style layer: a popup surface, the query as a large borderless field over a hairline, the selected row
+        in the soft accent tint (its text stays the normal text color)."""
+        from . import style
+
+        if not style.active():
+            return
+        from .style.tokens import rgba
+
+        t = style.current()
+        self.setStyleSheet(
+            f"#leafPalette {{ background: {rgba(t.popup)}; border: 1px solid {rgba(t.stroke2)}; border-radius: {t.r_l}px; }}"
+            f"#leafPalette QLineEdit {{ background: transparent; border: none; border-bottom: 1px solid {rgba(t.stroke)};"
+            f" border-radius: 0; padding: 8px 10px 10px 10px; font-size: {t.pt * 1.15:.1f}pt; }}"
+            f"#leafPalette QLineEdit:focus {{ border: none; border-bottom: 1px solid {rgba(t.stroke)}; padding-bottom: 10px; }}"
+            "#leafPalette QListWidget { background: transparent; }")
+        self.layout().setContentsMargins(6, 4, 6, 6)
+        pal = self.list.palette()
+        pal.setColor(QPalette.ColorGroup.Active, QPalette.ColorRole.Highlight, t.accent_soft)
+        pal.setColor(QPalette.ColorGroup.Active, QPalette.ColorRole.HighlightedText, t.text)
+        self.list.setPalette(pal)
+
     def popup(self) -> None:
+        self._restyle()  # the theme may have changed since the last time
         self.collect()
         self.edit.clear()
         self.refilter()

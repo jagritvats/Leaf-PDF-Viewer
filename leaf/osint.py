@@ -15,7 +15,8 @@ handle and under QT_QPA_PLATFORM=offscreen).
 - Sleep: SetThreadExecutionState(ES_SYSTEM_REQUIRED) on Windows, org.freedesktop.ScreenSaver.Inhibit on Linux
   (inhibits idle, which is what suspends a desktop session), reference counted.
 - Dark title bar: DwmSetWindowAttribute(DWMWA_USE_IMMERSIVE_DARK_MODE) following the window palette. Qt 6 does
-  this itself when the *system* is dark; this keeps the frame right when the app palette differs. No Mica: it
+  this itself when the *system* is dark; this keeps the frame right when the app palette differs. With the style
+  layer on (leaf/style) the caption also takes the chrome color (Windows 11; ignored by Windows 10). No Mica: it
   needs a translucent window background, which fights the palette-painted welcome screen.
 - Pen input: `PenInput` (an event filter on the canvas viewport): pressure -> per-point ink width, the eraser
   end deletes ink strokes under it, the barrel button pans, touches are ignored while the pen is near (palm
@@ -336,10 +337,19 @@ def apply_title_bar(win) -> bool:
         fn = ctypes.windll.dwmapi.DwmSetWindowAttribute
         fn.argtypes = [ctypes.c_void_p, ctypes.c_uint, ctypes.c_void_p, ctypes.c_uint]
         fn.restype = ctypes.c_long
+        ok = False
         for attr in (DWMWA_USE_IMMERSIVE_DARK_MODE, DWMWA_USE_IMMERSIVE_DARK_MODE_OLD):
             if fn(hwnd, attr, ctypes.byref(val), ctypes.sizeof(val)) == 0:
-                return True
-        return False
+                ok = True
+                break
+        from . import style
+
+        t = style.current()
+        if not t.platform:  # Windows 11: the title bar in the chrome color, one surface with the menu bar
+            from .style import dwm
+
+            dwm.caption(win, t.chrome, t.text)
+        return ok
     except Exception:  # noqa: BLE001
         return False
 

@@ -18,6 +18,18 @@ from PySide6.QtGui import (
 from PySide6.QtWidgets import QApplication
 
 STROKE = 1.6  # in the 24-unit grid; ~1.3 px at the 20 px toolbar size, scales with DPI
+STROKE_PX: float | None = None  # set by the style layer: the same line width in logical px at every icon size
+CHECKED: QColor | None = None  # set by the style layer: palette-colored icons of checked buttons (QIcon.On)
+
+
+def configure(stroke_px: float | None, checked: QColor | None) -> None:
+    """Style layer: a constant stroke in logical pixels (16, 20 and 24 px icons keep the same optical weight) and
+    a color for checked tools, so the selected one reads at a glance. Icons are made again on the next icon()."""
+    global STROKE_PX, CHECKED
+    STROKE_PX, CHECKED = stroke_px, QColor(checked) if checked is not None else None
+    _cache.clear()
+    for e in _engines:
+        e._pm.clear()
 
 
 def _p(*pts) -> QPainterPath:
@@ -309,10 +321,12 @@ def _draw(name: str, p: QPainter) -> None:  # 24x24 canvas
 class _Engine(QIconEngine):
     """Paints the vector icon at whatever size/DPR Qt asks for and caches the result."""
 
-    def __init__(self, name: str, color: QColor, disabled: QColor):
+    def __init__(self, name: str, color: QColor, disabled: QColor, auto: bool = False):
         super().__init__()
         self.name, self.color, self.disabled = name, QColor(color), QColor(disabled)
+        self.auto = auto  # palette-colored (no explicit color): checked buttons may show it in CHECKED
         self._pm: dict[tuple, QPixmap] = {}
+        self._dpr = 1.0
 
     def paint(self, p: QPainter, rect: QRect, mode, state) -> None:
         p.save()
@@ -321,23 +335,31 @@ class _Engine(QIconEngine):
         p.translate(rect.x() + (rect.width() - 24 * s) / 2, rect.y() + (rect.height() - 24 * s) / 2)
         p.scale(s, s)
         col = self.disabled if mode == QIcon.Mode.Disabled else self.color
-        p.setPen(QPen(col, STROKE, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin))
+        if self.auto and CHECKED is not None and state == QIcon.State.On and mode != QIcon.Mode.Disabled:
+            col = CHECKED
+        width = STROKE
+        if STROKE_PX is not None:  # rect is in device pixels when rendering a pixmap (_render), logical otherwise
+            width = max(1.1, min(STROKE_PX * self._dpr / max(s, 1e-3), 2.6))
+        p.setPen(QPen(col, width, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin))
         p.setBrush(Qt.BrushStyle.NoBrush)
         _draw(self.name, p)
         p.restore()
 
     def _render(self, size: QSize, mode, state, scale: float) -> QPixmap:
         w, h = max(1, round(size.width() * scale)), max(1, round(size.height() * scale))
-        key = (w, h, int(mode == QIcon.Mode.Disabled), scale)
+        on = self.auto and CHECKED is not None and state == QIcon.State.On
+        key = (w, h, int(mode == QIcon.Mode.Disabled), on, scale)
         pm = self._pm.get(key)
         if pm is None:
             pm = QPixmap(w, h)
             pm.fill(Qt.GlobalColor.transparent)
             p = QPainter(pm)
+            self._dpr = scale
             self.paint(p, QRect(QPoint(0, 0), QSize(w, h)), mode, state)
+            self._dpr = 1.0
             p.end()
             pm.setDevicePixelRatio(scale)
-            if len(self._pm) > 24:
+            if len(self._pm) > 32:
                 self._pm.clear()
             self._pm[key] = pm
         return pm
@@ -352,7 +374,7 @@ class _Engine(QIconEngine):
         return size
 
     def clone(self) -> "_Engine":
-        e = _Engine(self.name, self.color, self.disabled)
+        e = _Engine(self.name, self.color, self.disabled, self.auto)
         _engines.append(e)
         return e
 
@@ -368,10 +390,10 @@ def icon(name: str, color: QColor | None = None) -> QIcon:
     pal = QApplication.palette()
     col = QColor(color) if color is not None else pal.color(QPalette.ColorRole.WindowText)
     disabled = pal.color(QPalette.ColorGroup.Disabled, QPalette.ColorRole.WindowText)
-    key = (name, col.rgba(), disabled.rgba())
+    key = (name, col.rgba(), disabled.rgba(), color is None)
     ico = _cache.get(key)
     if ico is None:
-        eng = _Engine(name, col, disabled)
+        eng = _Engine(name, col, disabled, color is None)
         _engines.append(eng)
         ico = _cache[key] = QIcon(eng)
     return ico

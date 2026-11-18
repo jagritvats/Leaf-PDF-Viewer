@@ -135,19 +135,40 @@ class PageItem(QGraphicsItem):
             self.img_scale = 0.0
             self.job = None  # a render in flight is for the old rotation/crop
 
+    SHADOW = 9.0  # room for the page shadow around the page, in page units (only painting sees it)
+
     def page_rect(self) -> QRectF:
         return QRectF(0, 0, self.w, self.h)
 
+    def scene_page_rect(self) -> QRectF:
+        """The page itself in scene coordinates (sceneBoundingRect also holds the shadow margin)."""
+        return self.mapRectToScene(self.page_rect())
+
     def boundingRect(self) -> QRectF:
-        return QRectF(-1, -1, self.w + 4, self.h + 4)
+        m = self.SHADOW
+        return QRectF(-m, -m + 2, self.w + 2 * m, self.h + 2 * m)
+
+    def shape(self) -> QPainterPath:
+        path = QPainterPath()  # hits: the page only, not its shadow
+        path.addRect(self.page_rect())
+        return path
 
     def paint(self, p: QPainter, opt, widget=None) -> None:
         r = self.page_rect()
-        # soft shadow, sized in screen pixels but kept inside boundingRect's margins (1 left/top, 3 right/bottom)
+        # soft layered shadow: screen-pixel sized (page-space capped, so it shrinks when zoomed far out), three
+        # bands around the page only, never under it: plain fills, no antialiasing, no clipping
         px = 1.0 / max(abs(p.worldTransform().m11()), 1e-3)
-        for i, a in ((3, 10), (2, 18), (1, 32)):
-            e, o = min(i * px, 0.95), min(i * px * 0.7, 1.9)
-            p.fillRect(r.adjusted(-e, o - e, e, o + e), QColor(0, 0, 0, a))
+        dark = self.canvas.backgroundBrush().color().lightness() < 100
+        for i in (3, 2, 1):
+            spread = min(i * 2.6 * px, self.SHADOW - 1)
+            dy = min((0.8 + i * 0.9) * px, 4.0)
+            a = (0.07 if dark else 0.036) * (1.0 - (i - 1) / 3) + (0.025 if dark else 0.01)
+            c = QColor(0, 0, 0, round(255 * a))
+            o = r.adjusted(-spread, -spread + dy, spread, spread + dy)
+            p.fillRect(QRectF(o.left(), o.top(), o.width(), r.top() - o.top()), c)  # above
+            p.fillRect(QRectF(o.left(), r.bottom(), o.width(), o.bottom() - r.bottom()), c)  # below
+            p.fillRect(QRectF(o.left(), r.top(), r.left() - o.left(), r.height()), c)  # left
+            p.fillRect(QRectF(r.right(), r.top(), o.right() - r.right(), r.height()), c)  # right
         p.fillRect(r, QColor(24, 24, 24) if self.canvas.night else Qt.GlobalColor.white)  # no white flash in night mode
         img = self.img or self.preview
         if img is not None:
@@ -773,7 +794,7 @@ class Canvas(QGraphicsView):
         if 0 <= i < len(self.order):
             for j in range(self._row_start(i), i + 1):
                 it = self.order[j]
-                if it.isVisible() and it.sceneBoundingRect().adjusted(1, 1, -4, -4).contains(sp):
+                if it.isVisible() and it.scene_page_rect().contains(sp):
                     return it
         return None
 
@@ -1670,6 +1691,13 @@ class Canvas(QGraphicsView):
 
     # ---------------------------------------------------------------- misc
     def _update_bg(self) -> None:
+        from . import style
+
+        if getattr(self, "presenting", False):  # black while presenting (set_presenting)
+            return
+        if style.active():  # the style's backdrop token
+            self.setBackgroundBrush(style.current().canvas)
+            return
         pal = self.palette()
         base = pal.color(QPalette.ColorRole.Window)
         # a calm backdrop one step away from the window color, so white pages stand out in light and dark

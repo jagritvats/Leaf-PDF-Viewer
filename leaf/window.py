@@ -17,7 +17,7 @@ from . import commands as C
 from . import pageops
 from .canvas import Canvas
 from .document import IMAGE_EXTS, SEARCH_FLAGS, PasswordRequired, PdfDocument
-from . import i18n
+from . import i18n, style
 from .i18n import tr
 from .icons import app_icon, icon
 from .items import DEFAULTS
@@ -208,6 +208,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         i18n.install()  # Qt's own + Leaf's translations, pseudo-locale (once per process)
+        style.prepare_app()  # app-wide look (style, palette, fonts) before any widget is measured (once per process)
         _windows.append(self)
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
         self.settings = QSettings()
@@ -267,6 +268,7 @@ class MainWindow(QMainWindow):
             self.restoreState(state)
         self.setAcceptDrops(True)
         self._sync_view()
+        style.install(self)  # panel headers, rounded page view, command search box (no-op in high contrast)
 
     # ----------------------------------------------------------- view stack
     def add_view(self, key: str, widget: QWidget) -> None:
@@ -493,6 +495,11 @@ class MainWindow(QMainWindow):
 
         if high_contrast():  # a11y: a faint tint vanishes in high-contrast themes; outline the group instead
             self.tool_strip.setStyleSheet("#toolstrip { border: 1px solid palette(window-text); border-radius: 7px; }")
+            return
+        if style.active():  # a segmented control: layer fill, hairline, rounded
+            from .style.chrome import tool_strip_css
+
+            self.tool_strip.setStyleSheet(tool_strip_css())
             return
         self.tool_strip.setStyleSheet(f"#toolstrip {{ background: {bg}; border-radius: 7px; }}")
 

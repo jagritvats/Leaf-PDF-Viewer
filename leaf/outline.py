@@ -433,7 +433,7 @@ class OutlinePanel(QWidget):
         y = vr.top() + 2
         pg = None
         for it in cv.order:
-            r = it.sceneBoundingRect()
+            r = it.scene_page_rect()
             if it.isVisible() and r.top() - 12 <= y <= r.bottom() and r.right() >= vr.left() and r.left() <= vr.right():
                 pg = it
                 break
@@ -441,7 +441,7 @@ class OutlinePanel(QWidget):
             pg = cv.current_page_item()
         if pg is None:
             return None
-        sr = pg.sceneBoundingRect()
+        sr = pg.scene_page_rect()
         lp = pg.content.mapFromScene(QPointF(sr.center().x(), max(y, sr.top())))
         cr = pg.content.rect()
         if lp.y() <= cr.top() + 4:
