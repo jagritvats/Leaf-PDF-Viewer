@@ -102,7 +102,7 @@ class Paths:
             out = self._check(output, "output")
             if os.path.splitext(out)[1].lower() != ext:
                 raise ToolError(f"output: must end in {ext}")
-            if os.path.exists(out):
+            if os.path.lexists(out):
                 raise ToolError(f"output: {output} already exists (Leaf never overwrites files)")
             if not os.path.isdir(os.path.dirname(out)):
                 raise ToolError("output: the folder doesn't exist")
@@ -110,10 +110,38 @@ class Paths:
         stem = os.path.splitext(src)[0]
         out = f"{stem}-{suffix}{ext}"
         n = 2
-        while os.path.exists(out):
+        while os.path.lexists(out):
             out = f"{stem}-{suffix} ({n}){ext}"
             n += 1
         return out
+
+
+def write_new(out: str, write) -> None:
+    """`write(path)` writes the file; it is written to a fresh hidden file next to `out` and then copied to `out`
+    with an exclusive create. So whatever appeared at `out` after new_out() checked it (a file, or a symlink to
+    one elsewhere) is never overwritten or followed: the tool fails instead."""
+    import shutil
+    import tempfile
+
+    fd, tmp = tempfile.mkstemp(prefix=".leaf-", suffix=os.path.splitext(out)[1], dir=os.path.dirname(out))
+    os.close(fd)
+    try:
+        write(tmp)
+        try:
+            dst = open(out, "xb")  # noqa: SIM115 - O_EXCL: fails on an existing file or (dangling) symlink
+        except FileExistsError:
+            raise ToolError(f"output: {out} already exists (Leaf never overwrites files)") from None
+        try:
+            with dst, open(tmp, "rb") as src:
+                shutil.copyfileobj(src, dst)
+        except BaseException:
+            os.remove(out)
+            raise
+    finally:
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
 
 
 # ===================================================================== pdf helpers
@@ -648,7 +676,7 @@ class Server:
             if not done:
                 return {"output": None, "skipped_pages": skipped,
                         "message": "every page already has text; pass all_pages=true to recognize anyway"}
-            doc.save(out, garbage=3, deflate=True)
+            write_new(out, lambda t: doc.save(t, garbage=3, deflate=True))
         finally:
             doc.close()
         return {"output": out, "engine": info.key, "language": language, "pages": done, "skipped_pages": skipped,
@@ -688,7 +716,7 @@ class Server:
                 page.apply_redactions(images=pymupdf.PDF_REDACT_IMAGE_PIXELS,
                                       graphics=pymupdf.PDF_REDACT_LINE_ART_REMOVE_IF_TOUCHED,
                                       text=pymupdf.PDF_REDACT_TEXT_REMOVE)
-            doc.save(out, garbage=4, deflate=True)
+            write_new(out, lambda t: doc.save(t, garbage=4, deflate=True))
         finally:
             doc.close()
         res = {"confirmed": True, "count": len(listed), "hits": listed, "output": out}
@@ -706,8 +734,7 @@ class Server:
         doc = _open(path)
         try:
             rows = rows_for(a.get("pages"), doc.page_count)
-            for _ in export_text(doc, rows, out, markdown=md):
-                pass
+            write_new(out, lambda t: [None for _ in export_text(doc, rows, t, markdown=md)])
         finally:
             doc.close()
         return {"output": out, "pages": len(rows), "bytes": os.path.getsize(out)}
@@ -747,7 +774,7 @@ def apply_edit_set_to_copy(editset, path: str, data: dict, out: str) -> list[str
         warnings = list(editset.apply_to_document(doc, data, base_dir=os.path.dirname(path)) or [])
     except editset.EditSetError as ex:
         raise ToolError(f"invalid edit set: {ex}") from ex
-    editset.save(doc, out)
+    write_new(out, lambda t: editset.save(doc, t))
     return warnings
 
 
