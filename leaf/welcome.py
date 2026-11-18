@@ -482,10 +482,14 @@ class WelcomeView(QWidget):
         if it is None:
             return
         path = it.data(PATH_ROLE)
+        from .shellint import reveal
+
         m = QMenu(self)
-        m.addAction(icon("open"), "Open", lambda: self.win.open_path(path))
-        m.addAction(icon("close"), "Remove from list", lambda: self.remove(path))
+        m.setDefaultAction(m.addAction(icon("open"), "Open", lambda: self.win.open_path(path)))
+        m.addAction("Show in folder", lambda: reveal(path))
+        m.addAction("Copy path", lambda: QApplication.clipboard().setText(os.path.normpath(path)))
         m.addSeparator()
+        m.addAction(icon("close"), "Remove from list", lambda: self.remove(path))
         m.addAction("Clear list", self.clear_recent)
         m.exec(self.recent.viewport().mapToGlobal(pos))
 
