@@ -7,8 +7,8 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 import pytest
 from PySide6.QtCore import QEvent, QPoint, QPointF, Qt
-from PySide6.QtGui import QColor, QKeyEvent
-from PySide6.QtWidgets import QApplication
+from PySide6.QtGui import QColor, QKeyEvent, QUndoCommand
+from PySide6.QtWidgets import QApplication, QMessageBox
 
 from tests.e2e_kit import (  # noqa: F401
     CTRL, SHIFT, activate, click, driver, key, open_in, pump, sandbox, shortcut, wait_until, windows,
@@ -72,6 +72,34 @@ def test_style_active_and_window_dressed(app, windows):  # noqa: F811
     pal = win.findChild(CommandPalette)
     assert pal is not None and pal.isVisible()
     pal.hide()
+
+
+def test_idle_window_does_not_resync_panels(app, windows, doc):  # noqa: F811
+    """Dressing a panel tab bar again (setElideMode relayouts it even unchanged) posted a LayoutRequest that queued
+    the next sync: a 0 ms loop at full CPU that also repainted the panel corners."""
+    win = windows()
+    open_in(win, doc)
+    win.comments_dock.show()  # a tab group on the right
+    pump(0.2)
+    ticks = []
+    win.docks._later.timeout.connect(lambda: ticks.append(1))
+    pump(0.5)
+    assert len(ticks) <= 2
+
+
+def test_style_sheet_changes_no_font_in_a_state(app):  # noqa: F811
+    """Qt draws a font set in a pseudo-state rule (:default, :hover...) but measures the widget with its own font:
+    the default button's bold text was cut off ("Browse..." in the Sign dialog)."""
+    import re
+
+    from leaf.style import theme, tokens
+
+    for dark in (False, True):
+        css = theme.stylesheet(tokens.build(dark, None), {k: "x" for k in theme.ASSETS})
+        css = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+        bad = [sel.strip() for sel, body in re.findall(r"([^{}]+)\{([^}]*)\}", css)
+               if "font" in body and re.search(r"(?<!:):(?!:)", sel)]
+        assert not bad, bad
 
 
 def test_page_hits_ignore_the_shadow_margin(app, windows, doc):  # noqa: F811
@@ -202,6 +230,78 @@ def test_focus_mode_hides_bars_while_presenting(app, windows, doc):  # noqa: F81
     win.a_focus_mode.trigger()
 
 
+@pytest.mark.parametrize("steps", [
+    ("focus", "full", "focus", "full"),  # leaving Focus mode while full screen
+    ("full", "focus", "full", "focus"),  # leaving full screen while in Focus mode
+    ("focus", "present", "focus", "present"),
+    ("present", "focus", "present", "focus"),
+])
+def test_focus_mode_with_full_screen_and_presenting(app, windows, doc, steps):  # noqa: F811
+    """Each one puts back what it hid, in either order. Leaving Focus mode in full screen, then full screen, lost
+    the menu bar, toolbars and status bar; leaving full screen in Focus mode put them over Focus mode."""
+    win = windows()
+    open_in(win, doc)
+    before = _chrome(win)
+    acts = {"focus": win.a_focus_mode, "full": win.viewing.a_fullscreen, "present": win.a_presentation}
+    for i, s in enumerate(steps):
+        if s == "present" and win.canvas.presenting:
+            win.viewing.exit_presentation()
+        else:
+            acts[s].trigger()
+        pump(0.05)
+        if i == 2:  # one of the two still on
+            assert not any(_chrome(win)[k] for k in ("menu", "toolbar", "status")), (steps, _chrome(win))
+    assert not win.focus_mode.on and not win.canvas.presenting and not win.isFullScreen()
+    assert _chrome(win) == before
+
+
+@pytest.mark.parametrize("focus", [False, True])
+def test_closing_in_full_screen_saves_the_normal_toolbars(app, windows, doc, driver, focus):  # noqa: F811
+    """The toolbar layout saved on close is the normal one: closing in full screen (or Focus mode in full screen)
+    started the next window without its toolbar. A cancelled close stays in full screen."""
+    win = windows()
+    open_in(win, doc)
+    if focus:
+        win.a_focus_mode.trigger()
+        pump(0.05)
+    win.viewing.a_fullscreen.trigger()
+    pump(0.05)
+    win.canvas.undo.push(QUndoCommand("change"))  # unsaved: the first close asks, and is cancelled
+    driver.on("msg", lambda _m: QMessageBox.StandardButton.Cancel)
+    win.close()
+    pump(0.1)
+    assert win.isVisible() and win.viewing._screen_state is not None
+    assert not win.toolbar.isVisible() and not win.menuBar().isVisible()
+    win.canvas.undo.setClean()
+    win.close()
+    pump(0.1)
+    win2 = windows()
+    open_in(win2, doc)
+    if win2.focus_mode.on:
+        win2.a_focus_mode.trigger()
+        pump(0.05)
+    assert win2.toolbar.isVisible() and win2.menuBar().isVisible()
+
+
+def test_shortcut_editors_fit_their_rows(app, windows):  # noqa: F811
+    """The style's line edits are taller than a text row: the shortcuts list squeezed every editor to a sliver, so
+    no shortcut could be read."""
+    from PySide6.QtWidgets import QKeySequenceEdit
+
+    from leaf.shortcuts import ShortcutsDialog
+
+    win = windows()
+    dlg = ShortcutsDialog(win)
+    dlg.show()
+    pump(0.1)
+    eds = [e for e in dlg.findChildren(QKeySequenceEdit) if e.isVisible()]
+    assert eds
+    for e in eds[:5]:
+        line = e.findChild(type(dlg.search))
+        assert e.height() >= line.sizeHint().height() - 1, (e.height(), line.sizeHint().height())
+    dlg.close()
+
+
 # ------------------------------------------------------------------ start screen
 def test_start_screen_recent_open_and_clear(app, windows, tmp_path):  # noqa: F811
     paths = []
@@ -235,6 +335,27 @@ def test_start_screen_recent_open_and_clear(app, windows, tmp_path):  # noqa: F8
     assert os.path.normcase(wv.recent.item(0).data(Qt.ItemDataRole.UserRole)) == os.path.normcase(paths[1])
     wv.clear_btn.click()
     assert wv.recent.count() == 0 and not win.settings.value("recent") and wv.empty.isVisibleTo(wv)
+
+
+def test_start_screen_paints_covers_without_disk_access(app, windows, tmp_path, monkeypatch):  # noqa: F811
+    """A cover repaints on every hover: reading the file's time there stalled the window on a slow or vanished
+    network drive. It is read once per refresh."""
+    p = str(tmp_path / "net.pdf")
+    make_pdf(p, form=False)
+    win = windows()
+    win.settings.setValue("recent", [p])
+    wv = win.welcome
+    wv.refresh()
+    wait_until(lambda: wv.recent.item(0).data(Qt.ItemDataRole.UserRole + 7) is not None, msg="cover")
+    import leaf.welcome as welcome
+
+    stats = []
+    real = os.path.getmtime
+    monkeypatch.setattr(welcome.os.path, "getmtime", lambda q: stats.append(q) or real(q))
+    wv.recent.viewport().repaint()
+    assert wv.recent.isVisible() and not stats
+    wv.refresh()
+    assert stats and wv.recent.item(0).data(welcome.AGO_ROLE) == "Just now"
 
 
 def test_start_screen_scrolls_past_five_covers(app, windows, tmp_path):  # noqa: F811

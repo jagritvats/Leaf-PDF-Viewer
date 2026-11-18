@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import re
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QSize, Qt
 from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import (
     QApplication, QDialog, QDialogButtonBox, QHeaderView, QKeySequenceEdit, QLabel, QLineEdit, QMessageBox,
@@ -247,6 +247,9 @@ class ShortcutsDialog(QDialog):
         groups: dict[str, QTreeWidgetItem] = {}
         bold = self.font()
         bold.setBold(True)
+        # uniform rows take the first row's height (a group title): make room for the editor and the item padding
+        # around it, or the style's taller line edits are squeezed into a text line and the shortcuts can't be read
+        row_h = QSize(0, max(QKeySequenceEdit().sizeHint().height() + 8, self.tree.fontMetrics().height() + 8))
         for path, a in all_entries(win):
             g = groups.get(path[0])
             if g is None:
@@ -254,8 +257,10 @@ class ShortcutsDialog(QDialog):
                 g.setFirstColumnSpanned(True)
                 g.setFont(0, bold)
                 g.setFlags(Qt.ItemFlag.ItemIsEnabled)
+                g.setSizeHint(0, row_h)
             title = SEP.join(path[1:] + [clean(a.text())])
             row = QTreeWidgetItem(g, [title])
+            row.setSizeHint(0, row_h)
             row.setToolTip(0, a.property("base_tip") or title)
             self.titles[a] = title
             self.rows[a] = row

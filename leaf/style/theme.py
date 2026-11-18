@@ -184,7 +184,8 @@ QPushButton:hover {{ background: {c['control_hover']}; }}
 QPushButton:pressed {{ background: {c['layer2']}; color: {c['text2']}; }}
 QPushButton:disabled {{ color: {c['text3']}; background: {c['layer2']}; border-color: {c['stroke']}; }}
 QPushButton:focus {{ border-color: {c['accent']}; }}
-QPushButton:default, QPushButton#primary {{ background: {c['accent']}; color: {c['on_accent']}; border: 1px solid {c['accent']}; font-weight: 600; }}
+QPushButton:default, QPushButton#primary {{ background: {c['accent']}; color: {c['on_accent']}; border: 1px solid {c['accent']}; }}
+QPushButton#primary {{ font-weight: 600; }} /* not for :default: a font in a state is drawn but not measured (clipped) */
 QPushButton:default:hover, QPushButton#primary:hover {{ background: {c['accent_hover']}; border-color: {c['accent_hover']}; }}
 QPushButton:default:disabled {{ background: {c['stroke2']}; border-color: {c['stroke2']}; color: {c['text3']}; }}
 QPushButton:flat {{ background: transparent; border: 1px solid transparent; color: {c['accent']}; }}

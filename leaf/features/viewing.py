@@ -259,7 +259,18 @@ class Viewing:
     def _closing(self) -> None:
         if self._present_state is not None:
             self.exit_presentation()
+        if self._screen_state is not None:  # the toolbar layout saved on close is the normal one, not full screen's
+            vis = self._screen_state[1]
+            self._unhide(vis)
+            QTimer.singleShot(0, lambda: self._close_cancelled(vis))
         self.save_position()
+
+    def _close_cancelled(self, vis: dict) -> None:
+        try:
+            if self.win.isVisible() and self._screen_state is not None and self._screen_state[1] is vis:
+                self._hide(list(vis))
+        except RuntimeError:  # the window is gone
+            pass
 
     def message(self, text: str) -> None:
         toast = getattr(self.win, "toast", None)
@@ -306,13 +317,30 @@ class Viewing:
             x.hide()
         return state
 
-    @staticmethod
-    def _unhide(state: dict) -> None:
+    def _unhide(self, state: dict) -> None:
+        fm = getattr(self.win, "focus_mode", None)
+        if fm is not None and fm.on:  # Focus mode shows its part of it when it ends (not over Focus mode now)
+            state = fm.hand_over(state)
         for x, vis in state.items():
             try:
                 x.setVisible(vis)
             except RuntimeError:  # widget deleted meanwhile
                 pass
+
+    def hold(self, widgets: list) -> list:
+        """Focus mode ends during full screen or a presentation: what they hid stays hidden until they end (and is
+        shown then). Returns the widgets to show now."""
+        st = self._present_state or self._screen_state
+        if st is None:
+            return list(widgets)
+        hidden = st[1]
+        now = []
+        for x in widgets:
+            if x in hidden:
+                hidden[x] = True
+            else:
+                now.append(x)
+        return now
 
     def toggle_full_screen(self, on: bool) -> None:
         w = self.win

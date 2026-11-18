@@ -136,6 +136,35 @@ def test_theme_switch_applies(app, win):  # noqa: F811
     assert win.settings.value(S.THEME) == "system"
 
 
+def test_settings_notes_follow_a_live_theme_switch(app, win, monkeypatch):  # noqa: F811
+    """Appearance › Theme switches while the dialog is open: the notes must not keep the old theme's gray."""
+    from PySide6.QtGui import QPalette
+
+    from leaf import style
+    from leaf.a11y import contrast_ratio
+    from leaf.style import theme
+
+    if not style.active():
+        pytest.skip("style layer off")
+    dlg = S.SettingsDialog(win, "appearance")
+    dark = style.current().dark
+    try:
+        monkeypatch.setattr(theme, "is_dark", lambda _app: not dark)
+        style._reapply()
+        lab = S.note("A note under a setting")
+        dlg.layout().addWidget(lab)
+        pump(app, 0.05)
+        monkeypatch.setattr(theme, "is_dark", lambda _app: dark)
+        style._reapply()
+        pump(app, 0.05)
+        bg = dlg.palette().color(QPalette.ColorRole.Window)
+        assert contrast_ratio(lab.palette().color(lab.foregroundRole()), bg) >= 4.5
+    finally:
+        monkeypatch.undo()
+        style._reapply()
+        dlg.close()
+
+
 def test_theme_calls_style_hints(app, isolated, monkeypatch):  # noqa: F811
     calls = []
     hints = QGuiApplication.styleHints()

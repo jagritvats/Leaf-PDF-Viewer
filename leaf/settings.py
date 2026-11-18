@@ -119,9 +119,9 @@ def apply_nudge(win) -> None:
 # ------------------------------------------------------------------ building blocks
 def _secondary(label: QLabel) -> QLabel:
     label.setWordWrap(True)
-    pal = label.palette()
-    pal.setColor(QPalette.ColorRole.WindowText, pal.color(QPalette.ColorRole.PlaceholderText))
-    label.setPalette(pal)
+    # a role, not a copied color: the theme can switch while this dialog is open (Appearance › Theme), and a copy
+    # kept the old theme's gray (light gray on the light theme)
+    label.setForegroundRole(QPalette.ColorRole.PlaceholderText)
     return label
 
 

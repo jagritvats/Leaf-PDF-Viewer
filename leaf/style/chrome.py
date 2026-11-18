@@ -118,9 +118,14 @@ class DockManager(QObject):
             self._dress_tabbar(bar)
 
     def _dress_tabbar(self, bar: QTabBar) -> None:
-        bar.setDrawBase(False)
-        bar.setExpanding(False)
-        bar.setElideMode(Qt.TextElideMode.ElideRight)
+        # only when they differ: setElideMode() relayouts the bar even with the same mode, and its LayoutRequest on
+        # the window runs sync() again, a 0 ms loop that kept the CPU busy and repainted the panel corners
+        if bar.drawBase():
+            bar.setDrawBase(False)
+        if bar.expanding():
+            bar.setExpanding(False)
+        if bar.elideMode() != Qt.TextElideMode.ElideRight:
+            bar.setElideMode(Qt.TextElideMode.ElideRight)
         if bar.property("dressed"):
             self._place_close(bar)
             return

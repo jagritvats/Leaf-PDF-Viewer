@@ -307,10 +307,7 @@ class FocusMode(QObject):
         if remember:
             win.settings.setValue(KEY, on)
         if on and self.saved is None and win.canvas.doc is not None:
-            direct = Qt.FindChildOption.FindDirectChildrenOnly
-            parts = [win.menuBar(), *win.findChildren(QToolBar, options=direct), win.statusBar(),
-                     *win.findChildren(QDockWidget, options=direct)]
-            self.saved = [w for w in parts if w.isVisible()]
+            self.saved = [w for w in self._parts() if w.isVisible()]
             for w in self.saved:
                 w.hide()
             for tb in win.findChildren(QTabBar, options=Qt.FindChildOption.FindDirectChildrenOnly):
@@ -327,12 +324,15 @@ class FocusMode(QObject):
             saved, self.saved = self.saved, None
             for b in self.bars:
                 b.hide()
-            for w in saved:
+            viewing = getattr(win, "viewing", None)
+            show = viewing.hold(saved) if viewing is not None else saved  # full screen / presenting keep theirs
+            for w in show:
                 try:
                     w.show()
                 except RuntimeError:  # deleted meanwhile
                     pass
-            win.statusBar().setVisible(win.canvas.doc is not None)
+            if win.canvas.doc is None:
+                win.statusBar().hide()
             if win.canvas.doc is not None:
                 win.canvas.setFocus()
         self.action.blockSignals(True)
@@ -341,6 +341,25 @@ class FocusMode(QObject):
 
     def toggle(self) -> None:
         self.set_on(not self.on, remember=True)
+
+    def _parts(self) -> list[QWidget]:
+        """What Focus mode hides: menu bar, toolbars, status bar, panels."""
+        win, direct = self.win, Qt.FindChildOption.FindDirectChildrenOnly
+        return [win.menuBar(), *win.findChildren(QToolBar, options=direct), win.statusBar(),
+                *win.findChildren(QDockWidget, options=direct)]
+
+    def hand_over(self, state: dict) -> dict:
+        """Full screen or a presentation ends while Focus mode is on: of what they would show again ({widget:
+        visible}), Focus mode's part stays hidden and comes back when Focus mode ends. Returns the rest."""
+        parts = self._parts()
+        rest = {}
+        for w, vis in state.items():
+            if w in parts:
+                if vis and w not in self.saved:
+                    self.saved.append(w)
+            else:
+                rest[w] = vis
+        return rest
 
     def _sync_bars(self) -> None:
         vis = self.on and not getattr(self.win.canvas, "presenting", False)
