@@ -1,12 +1,12 @@
 # Leaf
 
-A fast, local PDF editor. Qt 6 UI in a Windows 11 (Fluent) style, light and dark, with your accent color (follows the system on Windows 11, KDE and GNOME; high-contrast themes keep the system look), MuPDF engine. Nothing leaves your machine.
+A free, fast, local PDF editor for Windows and Linux. Website: [leafpdf.org](https://leafpdf.org). Qt 6 UI in a Windows 11 (Fluent) style, light and dark, with your accent color (follows the system on Windows 11, KDE and GNOME; high-contrast themes keep the system look), MuPDF engine. Nothing leaves your machine.
 
 ![Leaf in dark mode: a report with highlights and a comment thread](docs/screenshots/annotate-dark.png)
 
 ![The start screen in light mode: recent files as page previews](docs/screenshots/start-screen-light.png)
 
-Downloads: [Releases](https://github.com/jagritvats/Leaf-PDF-Viewer/releases). Contributing: [CONTRIBUTING.md](CONTRIBUTING.md).
+Downloads: [leafpdf.org](https://leafpdf.org/#download), [Releases](https://github.com/jagritvats/Leaf-PDF-Viewer/releases) or the [Microsoft Store](https://apps.microsoft.com/detail/9P865XPB1QP3). Guides: [leafpdf.org/guides](https://leafpdf.org/guides/). Contributing: [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Run
 
