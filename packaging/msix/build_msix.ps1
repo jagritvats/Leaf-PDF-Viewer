@@ -58,6 +58,9 @@ if ($NoCli) {
     # rejects without a HeadlessAppBypass waiver. Store builds leave it out; the zip and installer keep leaf-cli.exe.
     Remove-Item (Join-Path $stage "leaf-cli.exe") -ErrorAction SilentlyContinue
 }
+# Store certification signs the package and fails with 0x800700C1 on a malformed PE file (see packaging/pecheck.py)
+& $Python packaging\pecheck.py $stage
+if ($LASTEXITCODE) { throw "malformed PE files in the bundle (listed above): the Store would reject the package" }
 & $Python packaging\msix\make_assets.py (Join-Path $stage "Assets")
 if ($LASTEXITCODE) { throw "make_assets.py failed" }
 

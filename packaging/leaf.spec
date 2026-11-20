@@ -82,6 +82,31 @@ def _keep(entry) -> bool:
 
 
 a.binaries = [e for e in a.binaries if _keep(e)]
+
+if WIN:
+    # uv's standalone CPython ships vcruntime140*.dll with the signature stripped but still referenced, which the
+    # Store's package signer rejects (0x800700C1). PySide6 and shiboken6 ship signed copies of the same files:
+    # bundle a good copy of any such DLL, and refuse to build if there is none.
+    sys.path.insert(0, SPECPATH)
+    import PySide6
+    import shiboken6
+    from pecheck import problem
+
+    _good_dirs = [os.path.dirname(PySide6.__file__), os.path.dirname(shiboken6.__file__)]
+
+    def _fix_binary(entry):
+        dest, src, kind = entry
+        if not problem(src):
+            return entry
+        name = os.path.basename(dest)
+        for d in _good_dirs:
+            cand = os.path.join(d, name)
+            if os.path.isfile(cand) and not problem(cand):
+                print(f"leaf.spec: bundling {cand} instead of {src} (malformed signature table)")
+                return (dest, cand, kind)
+        raise SystemExit(f"leaf.spec: {src}: {problem(src)}; no good copy found, signing would fail")
+
+    a.binaries = [_fix_binary(e) for e in a.binaries]
 a.datas = [e for e in a.datas if _keep(e)]
 pyz = PYZ(a.pure)
 

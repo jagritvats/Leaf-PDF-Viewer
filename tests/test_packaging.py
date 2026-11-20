@@ -295,3 +295,37 @@ def test_version_is_consistent():
     assert meta.find("releases/release").get("version") == __version__
     assert f'#define Version "{__version__}"' in _read("packaging", "leaf.iss")
     assert f"pkgver={__version__}\n" in _read("packaging", "aur", "PKGBUILD")
+
+
+def _pe(cert_off: int, cert_size: int, tail: int = 0) -> bytes:
+    """A minimal PE32+ image whose certificate table entry is (cert_off, cert_size)."""
+    import struct
+
+    b = bytearray(0x40 + 4 + 20 + 240 + tail)
+    b[:2] = b"MZ"
+    struct.pack_into("<I", b, 0x3C, 0x40)
+    b[0x40:0x44] = b"PE\0\0"
+    opt = 0x40 + 24
+    struct.pack_into("<H", b, opt, 0x20B)
+    struct.pack_into("<I", b, opt + 108, 16)
+    struct.pack_into("<II", b, opt + 112 + 8 * 4, cert_off, cert_size)
+    return bytes(b)
+
+
+def test_pecheck_finds_stripped_signatures(tmp_path):
+    """The Store's signer fails with 0x800700C1 on a DLL whose certificate table points past its end (uv's
+    vcruntime140.dll): pecheck reports it, and leaves good and non-PE files alone."""
+    import sys
+
+    sys.path.insert(0, os.path.join(ROOT, "packaging"))
+    import pecheck
+
+    good = len(_pe(0, 0)) + 16
+    (tmp_path / "ok.dll").write_bytes(_pe(good - 16, 16, tail=16))
+    (tmp_path / "unsigned.dll").write_bytes(_pe(0, 0))
+    (tmp_path / "stripped.dll").write_bytes(_pe(400, 20608))
+    (tmp_path / "fake.exe").write_bytes(b"not a program")
+    (tmp_path / "notes.txt").write_bytes(b"hello")
+    bad = dict(pecheck.bad_files(str(tmp_path)))
+    assert set(bad) == {"stripped.dll", "fake.exe"}
+    assert "past the end" in bad["stripped.dll"]
